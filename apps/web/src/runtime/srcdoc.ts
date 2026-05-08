@@ -764,12 +764,6 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
     if (total) total.textContent = pad2(count);
     if (prev) prev.toggleAttribute('disabled', i <= 0);
     if (next) next.toggleAttribute('disabled', i >= count - 1);
-    document.querySelectorAll('.slide-number').forEach(function(el){
-      el.setAttribute('data-current',i+1); el.setAttribute('data-total',count);
-    });
-    document.querySelectorAll('.progress-bar>span').forEach(function(el){
-      el.style.width=(count?((i+1)/count*100)+'%':'0');
-    });
   }
   function setActive(i){
     var list = slides();
@@ -850,11 +844,19 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
   function report(){
     try {
       var list = slides();
+      var i = activeIndex(list);
+      var count = list.length;
       window.parent.postMessage({
         type: 'od:slide-state',
-        active: activeIndex(list),
-        count: list.length,
+        active: i,
+        count: count,
       }, '*');
+      document.querySelectorAll('.slide-number').forEach(function(el){
+        el.setAttribute('data-current',i+1); el.setAttribute('data-total',count);
+      });
+      document.querySelectorAll('.progress-bar>span').forEach(function(el){
+        el.style.width=(count?((i+1)/count*100)+'%':'0');
+      });
     } catch (e) {}
   }
   function restoreInitialSlide(){
