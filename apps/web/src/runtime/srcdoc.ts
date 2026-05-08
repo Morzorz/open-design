@@ -105,13 +105,17 @@ function injectManualEditBridge(doc: string): string {
 }
 
 function injectBeforeHeadEnd(doc: string, payload: string): string {
-  if (/<\/head>/i.test(doc)) return doc.replace(/<\/head>/i, `${payload}</head>`);
+  const tag = '</head>';
+  const idx = doc.toLowerCase().indexOf(tag);
+  if (idx >= 0) return doc.slice(0, idx) + payload + doc.slice(idx);
   if (/<head[^>]*>/i.test(doc)) return doc.replace(/<head[^>]*>/i, (m) => `${m}${payload}`);
   return payload + doc;
 }
 
 function injectBeforeBodyEnd(doc: string, payload: string): string {
-  if (/<\/body>/i.test(doc)) return doc.replace(/<\/body>/i, `${payload}</body>`);
+  const tag = '</body>';
+  const idx = doc.toLowerCase().lastIndexOf(tag);
+  if (idx >= 0) return doc.slice(0, idx) + payload + doc.slice(idx);
   return doc + payload;
 }
 
@@ -631,12 +635,16 @@ html[data-od-comment-mode] body * { cursor: crosshair !important; }
 html[data-od-inspect-mode] body * { cursor: crosshair !important; }
 html[data-od-comment-mode][data-od-comment-mode-kind="pod"] body * { cursor: cell !important; }
 </style>`;
-  const withStyle = /<\/head>/i.test(doc)
-    ? doc.replace(/<\/head>/i, style + '</head>')
+  const headEndTag = '</head>';
+  const headEndIdx = doc.toLowerCase().indexOf(headEndTag);
+  const withStyle = headEndIdx >= 0
+    ? doc.slice(0, headEndIdx) + style + doc.slice(headEndIdx)
     : /<head[^>]*>/i.test(doc)
       ? doc.replace(/<head[^>]*>/i, (m) => m + style)
       : style + doc;
-  if (/<\/body>/i.test(withStyle)) return withStyle.replace(/<\/body>/i, script + '</body>');
+  const bodyEndTag = '</body>';
+  const bodyEndIdx = withStyle.toLowerCase().lastIndexOf(bodyEndTag);
+  if (bodyEndIdx >= 0) return withStyle.slice(0, bodyEndIdx) + script + withStyle.slice(bodyEndIdx);
   return withStyle + script;
 }
 
@@ -670,8 +678,10 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
   const styleFix = `<style data-od-deck-fix>
 .stage, .deck-stage, .deck-shell { place-content: center !important; }
 </style>`;
-  const docWithStyle = /<\/head>/i.test(doc)
-    ? doc.replace(/<\/head>/i, styleFix + "</head>")
+  const headEndTag = '</head>';
+  const headEndIdx = doc.toLowerCase().indexOf(headEndTag);
+  const docWithStyle = headEndIdx >= 0
+    ? doc.slice(0, headEndIdx) + styleFix + doc.slice(headEndIdx)
     : /<head[^>]*>/i.test(doc)
     ? doc.replace(/<head[^>]*>/i, (m) => m + styleFix)
     : styleFix + doc;
@@ -679,7 +689,7 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
   const script = `<script data-od-deck-bridge>(function(){
   var initialSlideIndex = ${safeInitialSlideIndex};
   var didRestoreInitialSlide = initialSlideIndex <= 0;
-  function slides(){ return document.querySelectorAll('.slide'); }
+  function slides(){ return document.querySelectorAll('.deck > .slide, .deck-stage > .slide, .deck-shell > .slide, body > .slide'); }
   function scroller(){
     if (document.body && document.body.scrollWidth > document.body.clientWidth + 1) return document.body;
     return document.scrollingElement || document.documentElement;
@@ -754,6 +764,12 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
     if (total) total.textContent = pad2(count);
     if (prev) prev.toggleAttribute('disabled', i <= 0);
     if (next) next.toggleAttribute('disabled', i >= count - 1);
+    document.querySelectorAll('.slide-number').forEach(function(el){
+      el.setAttribute('data-current',i+1); el.setAttribute('data-total',count);
+    });
+    document.querySelectorAll('.progress-bar>span').forEach(function(el){
+      el.style.width=(count?((i+1)/count*100)+'%':'0');
+    });
   }
   function setActive(i){
     var list = slides();
@@ -925,7 +941,9 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
   }
   observeSlides();
 })();</script>`;
-  if (/<\/body>/i.test(doc))
-    return doc.replace(/<\/body>/i, `${script}</body>`);
+  const bodyEndTag = '</body>';
+  const bodyEndIdx = doc.toLowerCase().lastIndexOf(bodyEndTag);
+  if (bodyEndIdx >= 0)
+    return doc.slice(0, bodyEndIdx) + script + doc.slice(bodyEndIdx);
   return doc + script;
 }
