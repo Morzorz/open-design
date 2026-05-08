@@ -104,19 +104,31 @@ function injectManualEditBridge(doc: string): string {
   return injectBeforeBodyEnd(withStyle, buildManualEditBridge(true));
 }
 
+// DOM-based HTML mutation: parse with DOMParser, apply mutations, serialize back.
+// Avoids string-matching pitfalls where </head>/<body> appear inside <script>
+// or <style> text — DOMParser correctly separates raw-text element content from
+// structural markup.
+function domMutate(doc: string, mutate: (parsed: Document) => void): string {
+  if (typeof DOMParser === 'undefined') return doc;
+  try {
+    const parsed = new DOMParser().parseFromString(doc, 'text/html');
+    mutate(parsed);
+    return serializeHtmlDocument(parsed);
+  } catch {
+    return doc;
+  }
+}
+
 function injectBeforeHeadEnd(doc: string, payload: string): string {
-  const tag = '</head>';
-  const idx = doc.toLowerCase().indexOf(tag);
-  if (idx >= 0) return doc.slice(0, idx) + payload + doc.slice(idx);
-  if (/<head[^>]*>/i.test(doc)) return doc.replace(/<head[^>]*>/i, (m) => `${m}${payload}`);
-  return payload + doc;
+  return domMutate(doc, (parsed) => {
+    if (parsed.head) parsed.head.insertAdjacentHTML('beforeend', payload);
+  });
 }
 
 function injectBeforeBodyEnd(doc: string, payload: string): string {
-  const tag = '</body>';
-  const idx = doc.toLowerCase().lastIndexOf(tag);
-  if (idx >= 0) return doc.slice(0, idx) + payload + doc.slice(idx);
-  return doc + payload;
+  return domMutate(doc, (parsed) => {
+    if (parsed.body) parsed.body.insertAdjacentHTML('beforeend', payload);
+  });
 }
 
 function injectBaseHref(doc: string, baseHref: string): string {
@@ -635,17 +647,10 @@ html[data-od-comment-mode] body * { cursor: crosshair !important; }
 html[data-od-inspect-mode] body * { cursor: crosshair !important; }
 html[data-od-comment-mode][data-od-comment-mode-kind="pod"] body * { cursor: cell !important; }
 </style>`;
-  const headEndTag = '</head>';
-  const headEndIdx = doc.toLowerCase().indexOf(headEndTag);
-  const withStyle = headEndIdx >= 0
-    ? doc.slice(0, headEndIdx) + style + doc.slice(headEndIdx)
-    : /<head[^>]*>/i.test(doc)
-      ? doc.replace(/<head[^>]*>/i, (m) => m + style)
-      : style + doc;
-  const bodyEndTag = '</body>';
-  const bodyEndIdx = withStyle.toLowerCase().lastIndexOf(bodyEndTag);
-  if (bodyEndIdx >= 0) return withStyle.slice(0, bodyEndIdx) + script + withStyle.slice(bodyEndIdx);
-  return withStyle + script;
+  return domMutate(doc, (parsed) => {
+    if (parsed.head) parsed.head.insertAdjacentHTML('beforeend', style);
+    if (parsed.body) parsed.body.insertAdjacentHTML('beforeend', script);
+  });
 }
 
 // The deck bridge supports three deck conventions found across our skills
@@ -678,14 +683,6 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
   const styleFix = `<style data-od-deck-fix>
 .stage, .deck-stage, .deck-shell { place-content: center !important; }
 </style>`;
-  const headEndTag = '</head>';
-  const headEndIdx = doc.toLowerCase().indexOf(headEndTag);
-  const docWithStyle = headEndIdx >= 0
-    ? doc.slice(0, headEndIdx) + styleFix + doc.slice(headEndIdx)
-    : /<head[^>]*>/i.test(doc)
-    ? doc.replace(/<head[^>]*>/i, (m) => m + styleFix)
-    : styleFix + doc;
-  doc = docWithStyle;
   const script = `<script data-od-deck-bridge>(function(){
   var initialSlideIndex = ${safeInitialSlideIndex};
   var didRestoreInitialSlide = initialSlideIndex <= 0;
@@ -943,9 +940,8 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
   }
   observeSlides();
 })();</script>`;
-  const bodyEndTag = '</body>';
-  const bodyEndIdx = doc.toLowerCase().lastIndexOf(bodyEndTag);
-  if (bodyEndIdx >= 0)
-    return doc.slice(0, bodyEndIdx) + script + doc.slice(bodyEndIdx);
-  return doc + script;
+  return domMutate(doc, (parsed) => {
+    if (parsed.head) parsed.head.insertAdjacentHTML('beforeend', styleFix);
+    if (parsed.body) parsed.body.insertAdjacentHTML('beforeend', script);
+  });
 }
