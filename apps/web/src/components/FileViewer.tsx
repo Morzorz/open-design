@@ -164,12 +164,12 @@ const EDITOR_WIDTH_KEY = 'open-design.manualEdit.editorWidth';
 const PREVIEW_WIDTH_KEY = 'open-design.manualEdit.previewWidth';
 const MANUAL_EDIT_KEYBOARD_STEP = 16;
 
-function readSavedWidth(key: string, fallback: number): number {
+function readSavedWidth(key: string, fallback: number, min: number): number {
   if (typeof window === 'undefined') return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
-    return Number.isFinite(parsed) ? Math.round(parsed) : fallback;
+    return Number.isFinite(parsed) ? Math.max(min, Math.round(parsed)) : fallback;
   } catch { return fallback; }
 }
 
@@ -3050,9 +3050,9 @@ function HtmlViewer({
   const manualEditSavingRef = useRef(false);
 
   // Manual edit panel resize state
-  const [layersWidth, setLayersWidth] = useState(() => readSavedWidth(LAYERS_WIDTH_KEY, LAYERS_DEFAULT_WIDTH));
-  const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH));
-  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH));
+  const [layersWidth, setLayersWidth] = useState(() => readSavedWidth(LAYERS_WIDTH_KEY, LAYERS_DEFAULT_WIDTH, LAYERS_MIN_WIDTH));
+  const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH, EDITOR_MIN_WIDTH));
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH, PREVIEW_PANEL_MIN_WIDTH));
   const [resizingPanel, setResizingPanel] = useState<'layers' | 'preview' | null>(null);
   const layersWidthRef = useRef(layersWidth);
   const editorWidthRef = useRef(editorWidth);
@@ -4459,15 +4459,14 @@ function HtmlViewer({
     const isRtl = workspace ? window.getComputedStyle(workspace).direction === 'rtl' : false;
 
     if (event.key === 'ArrowLeft') {
-      delta = -MANUAL_EDIT_KEYBOARD_STEP;
+      delta = isRtl ? MANUAL_EDIT_KEYBOARD_STEP : -MANUAL_EDIT_KEYBOARD_STEP;
     } else if (event.key === 'ArrowRight') {
-      delta = MANUAL_EDIT_KEYBOARD_STEP;
+      delta = isRtl ? -MANUAL_EDIT_KEYBOARD_STEP : MANUAL_EDIT_KEYBOARD_STEP;
     } else if (event.key === 'Home') {
       delta = side === 'layers' ? LAYERS_MIN_WIDTH - layersWidthRef.current : previewPanelWidthRef.current - PREVIEW_PANEL_MIN_WIDTH;
     } else {
       return;
     }
-    if (isRtl) delta = -delta;
     event.preventDefault();
 
     const r = redistributeWidths(side, delta, layersWidthRef.current, editorWidthRef.current, previewPanelWidthRef.current);
@@ -4527,6 +4526,16 @@ function HtmlViewer({
       )}
     </div>
   );
+
+  // ARIA max widths — use current sibling panel widths, not their mins
+  const ariaWs = workspaceRef.current;
+  const ariaWsW = ariaWs ? ariaWs.clientWidth : 0;
+  const ariaLayersMax = ariaWsW
+    ? Math.max(LAYERS_MIN_WIDTH, Math.round(ariaWsW - MANUAL_EDIT_HANDLE_WIDTH * 2 - EDITOR_MIN_WIDTH - previewPanelWidth))
+    : 9999;
+  const ariaPreviewMax = ariaWsW
+    ? Math.max(PREVIEW_PANEL_MIN_WIDTH, Math.round(ariaWsW - MANUAL_EDIT_HANDLE_WIDTH * 2 - layersWidth - EDITOR_MIN_WIDTH))
+    : 9999;
 
   return (
     <div className="viewer html-viewer">
@@ -4968,9 +4977,9 @@ function HtmlViewer({
                   onRedo={() => {
                     void redoManualEdit();
                   }}
-                  childrenAfter={<div className="manual-edit-resize-handle" role="separator" aria-orientation="vertical" aria-label={t('manualEdit.resizePreview')} tabIndex={0} onPointerDown={handlePreviewResizePointerDown} onKeyDown={handlePreviewResizeKeyDown} />}
+                  childrenAfter={<div className="manual-edit-resize-handle" role="separator" aria-orientation="vertical" aria-label={t('manualEdit.resizePreview')} aria-valuemin={PREVIEW_PANEL_MIN_WIDTH} aria-valuemax={ariaPreviewMax} aria-valuenow={previewPanelWidth} tabIndex={0} onPointerDown={handlePreviewResizePointerDown} onKeyDown={handlePreviewResizeKeyDown} />}
                 >
-                  <div className="manual-edit-resize-handle" role="separator" aria-orientation="vertical" aria-label={t('manualEdit.resizeLayers')} tabIndex={0} onPointerDown={handleLayersResizePointerDown} onKeyDown={handleLayersResizeKeyDown} />
+                  <div className="manual-edit-resize-handle" role="separator" aria-orientation="vertical" aria-label={t('manualEdit.resizeLayers')} aria-valuemin={LAYERS_MIN_WIDTH} aria-valuemax={ariaLayersMax} aria-valuenow={layersWidth} tabIndex={0} onPointerDown={handleLayersResizePointerDown} onKeyDown={handleLayersResizeKeyDown} />
                 </ManualEditPanel>
                 <div className="manual-edit-canvas">{previewFrame}</div>
               </>
