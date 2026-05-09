@@ -3084,6 +3084,7 @@ function HtmlViewer({
   const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH, EDITOR_MIN_WIDTH));
   const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH, PREVIEW_PANEL_MIN_WIDTH));
   const [resizingPanel, setResizingPanel] = useState<'layers' | 'preview' | null>(null);
+  const hasNormalizedRef = useRef(false);
   const layersWidthRef = useRef(layersWidth);
   const editorWidthRef = useRef(editorWidth);
   const previewPanelWidthRef = useRef(previewPanelWidth);
@@ -4395,11 +4396,15 @@ function HtmlViewer({
     if (pointerFrameRef.current !== null) cancelAnimationFrame(pointerFrameRef.current);
   }, []);
 
-  // Re-clamp restored widths against the actual workspace width (not viewport)
+  // Re-clamp restored widths against the actual workspace width (not viewport).
+  // Runs once: after source loads and manualEditMode makes the workspace visible.
   useLayoutEffect(() => {
+    if (hasNormalizedRef.current) return;
     const ws = workspaceRef.current;
     if (!ws) return;
-    const available = ws.clientWidth - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * MANUAL_EDIT_GAP;
+    const cs = window.getComputedStyle(ws);
+    const padH = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
+    const available = ws.clientWidth - padH - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * MANUAL_EDIT_GAP;
     if (available <= 0) return;
     const n = normalizePanelWidths(
       layersWidthRef.current,
@@ -4413,7 +4418,8 @@ function HtmlViewer({
     setEditorWidth(n.editor);
     previewPanelWidthRef.current = n.preview;
     setPreviewPanelWidth(n.preview);
-  }, []);
+    hasNormalizedRef.current = true;
+  }, [source, manualEditMode]);
 
   const handleResizePointerDown = useCallback((side: 'layers' | 'preview') => (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
