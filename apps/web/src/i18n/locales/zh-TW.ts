@@ -763,6 +763,8 @@ export const zhTW: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': '縮小',
   'fileViewer.zoomIn': '放大',
   'fileViewer.resetZoom': '重設縮放',

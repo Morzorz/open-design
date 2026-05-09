@@ -762,6 +762,8 @@ export const hu: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': 'Kicsinyítés',
   'fileViewer.zoomIn': 'Nagyítás',
   'fileViewer.resetZoom': 'Nagyítás visszaállítása',

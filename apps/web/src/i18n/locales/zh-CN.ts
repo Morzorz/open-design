@@ -763,6 +763,8 @@ export const zhCN: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "调整图层面板宽度",
+  'manualEdit.resizePreview': "调整预览面板宽度",
   'fileViewer.zoomOut': '缩小',
   'fileViewer.zoomIn': '放大',
   'fileViewer.resetZoom': '重置缩放',

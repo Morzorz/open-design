@@ -752,6 +752,8 @@ export const th: Dict = {
   'manualEdit.border': "ความหนาเส้น",
   'manualEdit.width': "ขนาดความกว้าง",
   'manualEdit.minHeight': "ส่วนเตี้ยที่สุด",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': 'หุบมุมมอง',
   'fileViewer.zoomIn': 'ซูมมองชัด',
   'fileViewer.resetZoom': 'ซูมรีเซ็ตหน้าจอ',

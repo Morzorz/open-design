@@ -651,6 +651,8 @@ export const esES: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': 'Reducir zoom',
   'fileViewer.zoomIn': 'Aumentar zoom',
   'fileViewer.resetZoom': 'Restablecer zoom',

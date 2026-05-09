@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import { emptyManualEditStyles, type ManualEditHistoryEntry, type ManualEditPatch, type ManualEditStyles, type ManualEditTarget } from '../edit-mode/types';
 
@@ -44,8 +44,12 @@ export function ManualEditPanel({
   onCancelDraft,
   onUndo,
   onRedo,
+  children,
+  childrenAfter,
 }: {
   targets: ManualEditTarget[];
+  children?: ReactNode;
+  childrenAfter?: ReactNode;
   selectedTarget: ManualEditTarget | null;
   draft: ManualEditDraft;
   history: ManualEditHistoryEntry[];
@@ -89,6 +93,8 @@ export function ManualEditPanel({
           ))}
         </div>
       </aside>
+
+      {children}
 
       <aside className="manual-edit-right">
         <section className="manual-edit-modal">
@@ -225,6 +231,8 @@ export function ManualEditPanel({
           )}
         </section>
       </aside>
+
+      {childrenAfter}
     </>
   );
 }

@@ -866,6 +866,8 @@ export const id: Dict = {
   'manualEdit.border': 'Border',
   'manualEdit.width': 'Lebar',
   'manualEdit.minHeight': 'Tinggi minimum',
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
 
   'fileViewer.zoomOut': 'Perkecil',
   'fileViewer.zoomIn': 'Perbesar',

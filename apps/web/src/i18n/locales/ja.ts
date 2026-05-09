@@ -649,6 +649,8 @@ export const ja: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': 'ズームアウト',
   'fileViewer.zoomIn': 'ズームイン',
   'fileViewer.resetZoom': 'ズームをリセット',

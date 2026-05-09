@@ -762,6 +762,8 @@ export const ar: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': 'تصغير',
   'fileViewer.zoomIn': 'تكبير',
   'fileViewer.resetZoom': 'إعادة تعيين الزوم',

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { APP_CHROME_FILE_ACTIONS_ID } from './AppChromeHeader';
 import { MarkdownRenderer, artifactRendererRegistry } from '../artifacts/renderer-registry';
@@ -150,6 +150,53 @@ const MARKDOWN_CODE_BLOCK_ATTR = 'data-markdown-code-block';
 const MARKDOWN_COPY_BLOCK_ATTR = 'data-copy-code-block';
 const MARKDOWN_COPY_BUTTON_CLASS = 'markdown-code-copy';
 const MARKDOWN_COPY_TOAST_CLASS = 'markdown-code-toast';
+
+// Manual edit panel resize constants
+const LAYERS_MIN_WIDTH = 180;
+const LAYERS_DEFAULT_WIDTH = 240;
+const EDITOR_MIN_WIDTH = 280;
+const EDITOR_DEFAULT_WIDTH = 420;
+const PREVIEW_PANEL_MIN_WIDTH = 280;
+const PREVIEW_PANEL_DEFAULT_WIDTH = 344;
+const MANUAL_EDIT_HANDLE_WIDTH = 8;
+const LAYERS_WIDTH_KEY = 'open-design.manualEdit.layersWidth';
+const EDITOR_WIDTH_KEY = 'open-design.manualEdit.editorWidth';
+const PREVIEW_WIDTH_KEY = 'open-design.manualEdit.previewWidth';
+const MANUAL_EDIT_KEYBOARD_STEP = 16;
+
+function readSavedWidth(key: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+    return Number.isFinite(parsed) ? Math.round(parsed) : fallback;
+  } catch { return fallback; }
+}
+
+function redistributeWidths(
+  side: 'layers' | 'preview',
+  delta: number,
+  layers: number,
+  editor: number,
+  preview: number,
+): { layers: number; editor: number; preview: number } {
+  if (side === 'layers') {
+    let newLayers = Math.max(LAYERS_MIN_WIDTH, Math.round(layers + delta));
+    let newEditor = editor - (newLayers - layers);
+    if (newEditor < EDITOR_MIN_WIDTH) {
+      newEditor = EDITOR_MIN_WIDTH;
+      newLayers = layers + editor - EDITOR_MIN_WIDTH;
+    }
+    return { layers: newLayers, editor: newEditor, preview };
+  }
+  let newPreview = Math.max(PREVIEW_PANEL_MIN_WIDTH, Math.round(preview - delta));
+  let newEditor = editor - (newPreview - preview);
+  if (newEditor < EDITOR_MIN_WIDTH) {
+    newEditor = EDITOR_MIN_WIDTH;
+    newPreview = preview + editor - EDITOR_MIN_WIDTH;
+  }
+  return { layers, editor: newEditor, preview: newPreview };
+}
 
 const DEPLOY_PROVIDER_OPTIONS: DeployProviderOption[] = [
   {
@@ -3001,6 +3048,28 @@ function HtmlViewer({
   const [manualEditError, setManualEditError] = useState<string | null>(null);
   const [manualEditSaving, setManualEditSaving] = useState(false);
   const manualEditSavingRef = useRef(false);
+
+  // Manual edit panel resize state
+  const [layersWidth, setLayersWidth] = useState(() => readSavedWidth(LAYERS_WIDTH_KEY, LAYERS_DEFAULT_WIDTH));
+  const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH));
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH));
+  const [resizingPanel, setResizingPanel] = useState<'layers' | 'preview' | null>(null);
+  const layersWidthRef = useRef(layersWidth);
+  const editorWidthRef = useRef(editorWidth);
+  const previewPanelWidthRef = useRef(previewPanelWidth);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const resizeStateRef = useRef<{
+    startClientX: number;
+    startLayers: number;
+    startEditor: number;
+    startPreview: number;
+    side: 'layers' | 'preview';
+    isRtl: boolean;
+  } | null>(null);
+  const pointerCleanupRef = useRef<(() => void) | null>(null);
+  const pointerFrameRef = useRef<number | null>(null);
+  const pendingPointerClientXRef = useRef<number | null>(null);
+
   const templateNameId = useId();
   const templateDescriptionId = useId();
   // Opt back into the legacy inline-asset srcDoc path via `?forceInline=1`
@@ -4287,6 +4356,178 @@ function HtmlViewer({
     return t('fileViewer.deployLinkPreparingLabel');
   };
 
+  // Manual edit panel resize handlers
+  useEffect(() => { layersWidthRef.current = layersWidth; }, [layersWidth]);
+  useEffect(() => { editorWidthRef.current = editorWidth; }, [editorWidth]);
+  useEffect(() => { previewPanelWidthRef.current = previewPanelWidth; }, [previewPanelWidth]);
+  useEffect(() => () => {
+    pointerCleanupRef.current?.();
+    if (pointerFrameRef.current !== null) cancelAnimationFrame(pointerFrameRef.current);
+  }, []);
+
+  const handleResizePointerDown = useCallback((side: 'layers' | 'preview') => (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+    event.preventDefault();
+    event.currentTarget.focus();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointerCleanupRef.current?.();
+    setResizingPanel(side);
+
+    const startLayers = layersWidthRef.current;
+    const startEditor = editorWidthRef.current;
+    const startPreview = previewPanelWidthRef.current;
+
+    const applyWidths = (layers: number, editor: number, preview: number) => {
+      layersWidthRef.current = layers;
+      setLayersWidth(layers);
+      editorWidthRef.current = editor;
+      setEditorWidth(editor);
+      previewPanelWidthRef.current = preview;
+      setPreviewPanelWidth(preview);
+    };
+
+    const updateFromClientX = (clientX: number) => {
+      const st = resizeStateRef.current;
+      if (!st) return;
+      let delta = clientX - st.startClientX;
+      if (st.isRtl) delta = -delta;
+
+      const r = redistributeWidths(side, delta, startLayers, startEditor, startPreview);
+      applyWidths(r.layers, r.editor, r.preview);
+    };
+
+    const flushMove = () => {
+      if (pointerFrameRef.current !== null) {
+        cancelAnimationFrame(pointerFrameRef.current);
+        pointerFrameRef.current = null;
+      }
+      const cx = pendingPointerClientXRef.current;
+      pendingPointerClientXRef.current = null;
+      if (cx !== null) updateFromClientX(cx);
+    };
+
+    const saveWidths = () => {
+      try {
+        window.localStorage.setItem(LAYERS_WIDTH_KEY, String(layersWidthRef.current));
+        window.localStorage.setItem(EDITOR_WIDTH_KEY, String(editorWidthRef.current));
+        window.localStorage.setItem(PREVIEW_WIDTH_KEY, String(previewPanelWidthRef.current));
+      } catch { /* ignore */ }
+    };
+
+    resizeStateRef.current = {
+      startClientX: event.clientX,
+      startLayers,
+      startEditor,
+      startPreview,
+      side,
+      isRtl: window.getComputedStyle(workspace).direction === 'rtl',
+    };
+
+    const onMove = (e: PointerEvent) => {
+      pendingPointerClientXRef.current = e.clientX;
+      if (pointerFrameRef.current !== null) return;
+      pointerFrameRef.current = requestAnimationFrame(() => { pointerFrameRef.current = null; flushMove(); });
+    };
+    const onEnd = () => { flushMove(); saveWidths(); setResizingPanel(null); pointerCleanupRef.current?.(); pointerCleanupRef.current = null; };
+    const onCancel = () => { flushMove(); applyWidths(startLayers, startEditor, startPreview); setResizingPanel(null); pointerCleanupRef.current?.(); pointerCleanupRef.current = null; };
+    const cleanup = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onEnd);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('blur', onCancel);
+    };
+    pointerCleanupRef.current = cleanup;
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onEnd);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('blur', onCancel);
+  }, []);
+
+  const handleLayersResizePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    handleResizePointerDown('layers')(event);
+  }, [handleResizePointerDown]);
+
+  const handlePreviewResizePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    handleResizePointerDown('preview')(event);
+  }, [handleResizePointerDown]);
+
+  const handleResizeKeyDown = useCallback((side: 'layers' | 'preview') => (event: React.KeyboardEvent<HTMLDivElement>) => {
+    let delta = 0;
+    const workspace = workspaceRef.current;
+    const isRtl = workspace ? window.getComputedStyle(workspace).direction === 'rtl' : false;
+
+    if (event.key === 'ArrowLeft') {
+      delta = -MANUAL_EDIT_KEYBOARD_STEP;
+    } else if (event.key === 'ArrowRight') {
+      delta = MANUAL_EDIT_KEYBOARD_STEP;
+    } else if (event.key === 'Home') {
+      delta = side === 'layers' ? LAYERS_MIN_WIDTH - layersWidthRef.current : PREVIEW_PANEL_MIN_WIDTH - previewPanelWidthRef.current;
+    } else {
+      return;
+    }
+    if (isRtl) delta = -delta;
+    event.preventDefault();
+
+    const r = redistributeWidths(side, delta, layersWidthRef.current, editorWidthRef.current, previewPanelWidthRef.current);
+    layersWidthRef.current = r.layers;
+    setLayersWidth(r.layers);
+    editorWidthRef.current = r.editor;
+    setEditorWidth(r.editor);
+    previewPanelWidthRef.current = r.preview;
+    setPreviewPanelWidth(r.preview);
+    try {
+      window.localStorage.setItem(LAYERS_WIDTH_KEY, String(layersWidthRef.current));
+      window.localStorage.setItem(EDITOR_WIDTH_KEY, String(editorWidthRef.current));
+      window.localStorage.setItem(PREVIEW_WIDTH_KEY, String(previewPanelWidthRef.current));
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleLayersResizeKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    handleResizeKeyDown('layers')(event);
+  }, [handleResizeKeyDown]);
+
+  const handlePreviewResizeKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    handleResizeKeyDown('preview')(event);
+  }, [handleResizeKeyDown]);
+
+  const previewFrame = (
+    <div
+      style={{
+        width: `${100 / previewScale}%`,
+        height: `${100 / previewScale}%`,
+        transform: `scale(${previewScale})`,
+        transformOrigin: '0 0',
+      }}
+    >
+      {useUrlLoadPreview ? (
+        <iframe
+          ref={iframeRef}
+          data-testid="artifact-preview-frame"
+          data-od-render-mode="url-load"
+          title={file.name}
+          sandbox="allow-scripts"
+          src={previewSrcUrl}
+          onLoad={syncBridgeModes}
+        />
+      ) : (
+        <iframe
+          ref={iframeRef}
+          data-testid="artifact-preview-frame"
+          data-od-render-mode="srcdoc"
+          title={file.name}
+          sandbox="allow-scripts"
+          srcDoc={srcDoc}
+          onLoad={() => {
+            replayInspectOverridesToIframe();
+            syncBridgeModes();
+          }}
+        />
+      )}
+    </div>
+  );
+
   return (
     <div className="viewer html-viewer">
       <div className="viewer-toolbar">
@@ -4696,75 +4937,46 @@ function HtmlViewer({
         {source === null ? (
           <div className="viewer-empty">{t('fileViewer.loading')}</div>
         ) : mode === 'preview' ? (
-          <div className={manualEditMode ? 'manual-edit-workspace' : 'comment-preview-layer'}>
+          <div
+            className={manualEditMode ? `manual-edit-workspace${resizingPanel ? ' is-resizing' : ''}` : 'comment-preview-layer'}
+            ref={workspaceRef}
+            style={manualEditMode ? { gridTemplateColumns: `${layersWidth}px ${MANUAL_EDIT_HANDLE_WIDTH}px ${editorWidth}px ${MANUAL_EDIT_HANDLE_WIDTH}px ${previewPanelWidth}px` } : undefined}
+          >
             {manualEditMode ? (
-              <ManualEditPanel
-                targets={manualEditTargets}
-                selectedTarget={selectedManualEditTarget}
-                draft={manualEditDraft}
-                history={manualEditHistory}
-                error={manualEditError}
-                canUndo={manualEditHistory.length > 0}
-                canRedo={manualEditUndone.length > 0}
-                busy={manualEditSaving}
-                onSelectTarget={selectManualEditTarget}
-                onDraftChange={setManualEditDraft}
-                onApplyPatch={(patch, label) => {
-                  void applyManualEdit(patch, label);
-                }}
-                onError={setManualEditError}
-                onCancelDraft={() => {
-                  if (selectedManualEditTarget) selectManualEditTarget(selectedManualEditTarget);
-                }}
-                onUndo={() => {
-                  void undoManualEdit();
-                }}
-                onRedo={() => {
-                  void redoManualEdit();
-                }}
-              />
-            ) : null}
-            <div className={manualEditMode ? 'manual-edit-canvas' : 'comment-frame-clip'}>
-              <div
-                style={{
-                  width: `${100 / previewScale}%`,
-                  height: `${100 / previewScale}%`,
-                  transform: `scale(${previewScale})`,
-                  transformOrigin: '0 0',
-                }}
-              >
-                {useUrlLoadPreview ? (
-                  <iframe
-                    ref={iframeRef}
-                    data-testid="artifact-preview-frame"
-                    data-od-render-mode="url-load"
-                    title={file.name}
-                    sandbox="allow-scripts"
-                    src={previewSrcUrl}
-                    onLoad={syncBridgeModes}
-                  />
-                ) : (
-                  <iframe
-                    ref={iframeRef}
-                    data-testid="artifact-preview-frame"
-                    data-od-render-mode="srcdoc"
-                    title={file.name}
-                    sandbox="allow-scripts"
-                    srcDoc={srcDoc}
-                    // Re-seeds the iframe-side bridge with the host's
-                    // authoritative inspect override map after each srcdoc
-                    // rebuild, then syncs comment/edit bridge modes.
-                    // URL-loaded iframes have no inspect bridge, so the
-                    // replay handler is intentionally only on the srcDoc
-                    // branch.
-                    onLoad={() => {
-                      replayInspectOverridesToIframe();
-                      syncBridgeModes();
-                    }}
-                  />
-                )}
-              </div>
-            </div>
+              <>
+                <ManualEditPanel
+                  targets={manualEditTargets}
+                  selectedTarget={selectedManualEditTarget}
+                  draft={manualEditDraft}
+                  history={manualEditHistory}
+                  error={manualEditError}
+                  canUndo={manualEditHistory.length > 0}
+                  canRedo={manualEditUndone.length > 0}
+                  busy={manualEditSaving}
+                  onSelectTarget={selectManualEditTarget}
+                  onDraftChange={setManualEditDraft}
+                  onApplyPatch={(patch, label) => {
+                    void applyManualEdit(patch, label);
+                  }}
+                  onError={setManualEditError}
+                  onCancelDraft={() => {
+                    if (selectedManualEditTarget) selectManualEditTarget(selectedManualEditTarget);
+                  }}
+                  onUndo={() => {
+                    void undoManualEdit();
+                  }}
+                  onRedo={() => {
+                    void redoManualEdit();
+                  }}
+                  childrenAfter={<div className="manual-edit-resize-handle" role="separator" aria-orientation="vertical" aria-label={t('manualEdit.resizePreview')} tabIndex={0} onPointerDown={handlePreviewResizePointerDown} onKeyDown={handlePreviewResizeKeyDown} />}
+                >
+                  <div className="manual-edit-resize-handle" role="separator" aria-orientation="vertical" aria-label={t('manualEdit.resizeLayers')} tabIndex={0} onPointerDown={handleLayersResizePointerDown} onKeyDown={handleLayersResizeKeyDown} />
+                </ManualEditPanel>
+                <div className="manual-edit-canvas">{previewFrame}</div>
+              </>
+            ) : (
+              <div className="comment-frame-clip">{previewFrame}</div>
+            )}
             {boardMode ? (
               <CommentPreviewOverlays
                 comments={previewComments}

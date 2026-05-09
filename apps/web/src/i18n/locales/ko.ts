@@ -762,6 +762,8 @@ export const ko: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': '축소',
   'fileViewer.zoomIn': '확대',
   'fileViewer.resetZoom': '배율 초기화',

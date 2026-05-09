@@ -774,6 +774,8 @@ export const ru: Dict = {
   'manualEdit.border': "Border",
   'manualEdit.width': "Width",
   'manualEdit.minHeight': "Min height",
+  'manualEdit.resizeLayers': "Resize layers panel",
+  'manualEdit.resizePreview': "Resize preview panel",
   'fileViewer.zoomOut': 'Уменьшить',
   'fileViewer.zoomIn': 'Увеличить',
   'fileViewer.resetZoom': 'Сбросить масштаб',
