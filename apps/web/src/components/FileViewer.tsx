@@ -4463,7 +4463,7 @@ function HtmlViewer({
     } else if (event.key === 'ArrowRight') {
       delta = MANUAL_EDIT_KEYBOARD_STEP;
     } else if (event.key === 'Home') {
-      delta = side === 'layers' ? LAYERS_MIN_WIDTH - layersWidthRef.current : PREVIEW_PANEL_MIN_WIDTH - previewPanelWidthRef.current;
+      delta = side === 'layers' ? LAYERS_MIN_WIDTH - layersWidthRef.current : previewPanelWidthRef.current - PREVIEW_PANEL_MIN_WIDTH;
     } else {
       return;
     }
