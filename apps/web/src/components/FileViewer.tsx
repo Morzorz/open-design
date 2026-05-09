@@ -164,13 +164,20 @@ const EDITOR_WIDTH_KEY = 'open-design.manualEdit.editorWidth';
 const PREVIEW_WIDTH_KEY = 'open-design.manualEdit.previewWidth';
 const MANUAL_EDIT_KEYBOARD_STEP = 16;
 
-function readSavedWidth(key: string, fallback: number, min: number): number {
+function readSavedWidth(key: string, fallback: number, min: number, max: number): number {
   if (typeof window === 'undefined') return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
-    return Number.isFinite(parsed) ? Math.max(min, Math.round(parsed)) : fallback;
+    if (!Number.isFinite(parsed)) return fallback;
+    const clampedMin = Math.max(min, Math.round(parsed));
+    return Math.min(clampedMin, max);
   } catch { return fallback; }
+}
+
+function panelMaxWidth(minOtherA: number, minOtherB: number): number {
+  if (typeof window === 'undefined') return 9999;
+  return Math.round(window.innerWidth - minOtherA - minOtherB - MANUAL_EDIT_HANDLE_WIDTH * 2);
 }
 
 function redistributeWidths(
@@ -3050,9 +3057,9 @@ function HtmlViewer({
   const manualEditSavingRef = useRef(false);
 
   // Manual edit panel resize state
-  const [layersWidth, setLayersWidth] = useState(() => readSavedWidth(LAYERS_WIDTH_KEY, LAYERS_DEFAULT_WIDTH, LAYERS_MIN_WIDTH));
-  const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH, EDITOR_MIN_WIDTH));
-  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH, PREVIEW_PANEL_MIN_WIDTH));
+  const [layersWidth, setLayersWidth] = useState(() => readSavedWidth(LAYERS_WIDTH_KEY, LAYERS_DEFAULT_WIDTH, LAYERS_MIN_WIDTH, panelMaxWidth(EDITOR_MIN_WIDTH, PREVIEW_PANEL_MIN_WIDTH)));
+  const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH, EDITOR_MIN_WIDTH, panelMaxWidth(LAYERS_MIN_WIDTH, PREVIEW_PANEL_MIN_WIDTH)));
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH, PREVIEW_PANEL_MIN_WIDTH, panelMaxWidth(LAYERS_MIN_WIDTH, EDITOR_MIN_WIDTH)));
   const [resizingPanel, setResizingPanel] = useState<'layers' | 'preview' | null>(null);
   const layersWidthRef = useRef(layersWidth);
   const editorWidthRef = useRef(editorWidth);
