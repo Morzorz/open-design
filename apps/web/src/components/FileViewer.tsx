@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { APP_CHROME_FILE_ACTIONS_ID } from './AppChromeHeader';
 import { MarkdownRenderer, artifactRendererRegistry } from '../artifacts/renderer-registry';
@@ -162,22 +162,45 @@ const MANUAL_EDIT_HANDLE_WIDTH = 8;
 const LAYERS_WIDTH_KEY = 'open-design.manualEdit.layersWidth';
 const EDITOR_WIDTH_KEY = 'open-design.manualEdit.editorWidth';
 const PREVIEW_WIDTH_KEY = 'open-design.manualEdit.previewWidth';
+const MANUAL_EDIT_GAP = 10;
 const MANUAL_EDIT_KEYBOARD_STEP = 16;
 
-function readSavedWidth(key: string, fallback: number, min: number, max: number): number {
+function readSavedWidth(key: string, fallback: number, min: number): number {
   if (typeof window === 'undefined') return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
-    if (!Number.isFinite(parsed)) return fallback;
-    const clampedMin = Math.max(min, Math.round(parsed));
-    return Math.min(clampedMin, max);
+    return Number.isFinite(parsed) ? Math.max(min, Math.round(parsed)) : fallback;
   } catch { return fallback; }
 }
 
-function panelMaxWidth(minOtherA: number, minOtherB: number): number {
-  if (typeof window === 'undefined') return 9999;
-  return Math.round(window.innerWidth - minOtherA - minOtherB - MANUAL_EDIT_HANDLE_WIDTH * 2);
+export function normalizePanelWidths(
+  layers: number,
+  editor: number,
+  preview: number,
+  available: number,
+): { layers: number; editor: number; preview: number } {
+  let l = Math.max(LAYERS_MIN_WIDTH, Math.round(layers));
+  let e = Math.max(EDITOR_MIN_WIDTH, Math.round(editor));
+  let p = Math.max(PREVIEW_PANEL_MIN_WIDTH, Math.round(preview));
+
+  let overflow = l + e + p - available;
+  if (overflow <= 0) return { layers: l, editor: e, preview: p };
+
+  // Squeeze editor first (flexible middle panel), then side panels if still overflowing
+  const squeezeE = Math.min(overflow, e - EDITOR_MIN_WIDTH);
+  e -= squeezeE;
+  overflow -= squeezeE;
+  if (overflow > 0) {
+    const squeezeL = Math.min(overflow, l - LAYERS_MIN_WIDTH);
+    l -= squeezeL;
+    overflow -= squeezeL;
+  }
+  if (overflow > 0) {
+    const squeezeP = Math.min(overflow, p - PREVIEW_PANEL_MIN_WIDTH);
+    p -= squeezeP;
+  }
+  return { layers: l, editor: e, preview: p };
 }
 
 function redistributeWidths(
@@ -3057,9 +3080,9 @@ function HtmlViewer({
   const manualEditSavingRef = useRef(false);
 
   // Manual edit panel resize state
-  const [layersWidth, setLayersWidth] = useState(() => readSavedWidth(LAYERS_WIDTH_KEY, LAYERS_DEFAULT_WIDTH, LAYERS_MIN_WIDTH, panelMaxWidth(EDITOR_MIN_WIDTH, PREVIEW_PANEL_MIN_WIDTH)));
-  const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH, EDITOR_MIN_WIDTH, panelMaxWidth(LAYERS_MIN_WIDTH, PREVIEW_PANEL_MIN_WIDTH)));
-  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH, PREVIEW_PANEL_MIN_WIDTH, panelMaxWidth(LAYERS_MIN_WIDTH, EDITOR_MIN_WIDTH)));
+  const [layersWidth, setLayersWidth] = useState(() => readSavedWidth(LAYERS_WIDTH_KEY, LAYERS_DEFAULT_WIDTH, LAYERS_MIN_WIDTH));
+  const [editorWidth, setEditorWidth] = useState(() => readSavedWidth(EDITOR_WIDTH_KEY, EDITOR_DEFAULT_WIDTH, EDITOR_MIN_WIDTH));
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(() => readSavedWidth(PREVIEW_WIDTH_KEY, PREVIEW_PANEL_DEFAULT_WIDTH, PREVIEW_PANEL_MIN_WIDTH));
   const [resizingPanel, setResizingPanel] = useState<'layers' | 'preview' | null>(null);
   const layersWidthRef = useRef(layersWidth);
   const editorWidthRef = useRef(editorWidth);
@@ -4370,6 +4393,26 @@ function HtmlViewer({
   useEffect(() => () => {
     pointerCleanupRef.current?.();
     if (pointerFrameRef.current !== null) cancelAnimationFrame(pointerFrameRef.current);
+  }, []);
+
+  // Re-clamp restored widths against the actual workspace width (not viewport)
+  useLayoutEffect(() => {
+    const ws = workspaceRef.current;
+    if (!ws) return;
+    const available = ws.clientWidth - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * MANUAL_EDIT_GAP;
+    if (available <= 0) return;
+    const n = normalizePanelWidths(
+      layersWidthRef.current,
+      editorWidthRef.current,
+      previewPanelWidthRef.current,
+      available,
+    );
+    layersWidthRef.current = n.layers;
+    setLayersWidth(n.layers);
+    editorWidthRef.current = n.editor;
+    setEditorWidth(n.editor);
+    previewPanelWidthRef.current = n.preview;
+    setPreviewPanelWidth(n.preview);
   }, []);
 
   const handleResizePointerDown = useCallback((side: 'layers' | 'preview') => (event: React.PointerEvent<HTMLDivElement>) => {
