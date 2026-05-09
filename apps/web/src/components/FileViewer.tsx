@@ -4534,15 +4534,9 @@ function HtmlViewer({
     </div>
   );
 
-  // ARIA max widths — use current sibling panel widths, not their mins
-  const ariaWs = workspaceRef.current;
-  const ariaWsW = ariaWs ? ariaWs.clientWidth : 0;
-  const ariaLayersMax = ariaWsW
-    ? Math.max(LAYERS_MIN_WIDTH, Math.round(ariaWsW - MANUAL_EDIT_HANDLE_WIDTH * 2 - EDITOR_MIN_WIDTH - previewPanelWidth))
-    : 9999;
-  const ariaPreviewMax = ariaWsW
-    ? Math.max(PREVIEW_PANEL_MIN_WIDTH, Math.round(ariaWsW - MANUAL_EDIT_HANDLE_WIDTH * 2 - layersWidth - EDITOR_MIN_WIDTH))
-    : 9999;
+  // ARIA max widths — derived from redistributeWidths limits (no DOM measurement needed)
+  const ariaLayersMax = Math.max(LAYERS_MIN_WIDTH, layersWidth + editorWidth - EDITOR_MIN_WIDTH);
+  const ariaPreviewMax = Math.max(PREVIEW_PANEL_MIN_WIDTH, previewPanelWidth + editorWidth - EDITOR_MIN_WIDTH);
 
   return (
     <div className="viewer html-viewer">
