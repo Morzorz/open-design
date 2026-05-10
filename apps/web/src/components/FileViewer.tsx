@@ -175,7 +175,7 @@ function readSavedWidth(key: string, fallback: number, min: number): number {
     const raw = window.localStorage.getItem(key);
     const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
     return Number.isFinite(parsed) ? Math.max(min, Math.round(parsed)) : fallback;
-  } catch { return fallback; }
+  } catch (e) { if (process.env.NODE_ENV !== 'production') console.warn(`readSavedWidth(${key}) failed:`, e); return fallback; }
 }
 
 export function normalizePanelWidths(
@@ -205,6 +205,12 @@ export function normalizePanelWidths(
     p -= squeezeP;
   }
   return { layers: l, editor: e, preview: p };
+}
+
+/** Measure the actual rendered width of the preview column (the 5th grid child). */
+function measureActualPreviewWidth(workspace: HTMLElement, fallback: number): number {
+  const canvas = workspace.querySelector('.manual-edit-canvas');
+  return canvas ? Math.round((canvas as HTMLElement).offsetWidth) : fallback;
 }
 
 function redistributeWidths(
@@ -4482,7 +4488,12 @@ function HtmlViewer({
 
     const startLayers = layersWidthRef.current;
     const startEditor = editorWidthRef.current;
-    const startPreview = previewPanelWidthRef.current;
+    // The preview column uses minmax(previewPanelWidth, 1fr), so its rendered
+    // width may exceed the state value on wide workspaces. Measure the actual
+    // width so redistributeWidths computes correct deltas during drag.
+    const startPreview = side === 'preview'
+      ? measureActualPreviewWidth(workspace, previewPanelWidthRef.current)
+      : previewPanelWidthRef.current;
 
     const applyWidths = (layers: number, editor: number, preview: number) => {
       layersWidthRef.current = layers;
@@ -4562,6 +4573,11 @@ function HtmlViewer({
     let delta = 0;
     const workspace = workspaceRef.current;
     const isRtl = workspace ? window.getComputedStyle(workspace).direction === 'rtl' : false;
+    // For the preview side, the rendered width (via minmax/1fr) may exceed the
+    // state value. Measure the actual width for correct resize math.
+    const currentPreview = side === 'preview' && workspace
+      ? measureActualPreviewWidth(workspace, previewPanelWidthRef.current)
+      : previewPanelWidthRef.current;
     // Arrow keys move the separator, not the aria-valuenow: ArrowRight = separator
     // moves right regardless of which side panel the value represents.
     if (event.key === 'ArrowLeft') {
@@ -4569,7 +4585,7 @@ function HtmlViewer({
     } else if (event.key === 'ArrowRight') {
       delta = isRtl ? -MANUAL_EDIT_KEYBOARD_STEP : MANUAL_EDIT_KEYBOARD_STEP;
     } else if (event.key === 'Home') {
-      delta = side === 'layers' ? LAYERS_MIN_WIDTH - layersWidthRef.current : previewPanelWidthRef.current - PREVIEW_PANEL_MIN_WIDTH;
+      delta = side === 'layers' ? LAYERS_MIN_WIDTH - layersWidthRef.current : currentPreview - PREVIEW_PANEL_MIN_WIDTH;
     } else if (event.key === 'End') {
       delta = side === 'layers' ? editorWidthRef.current - EDITOR_MIN_WIDTH : EDITOR_MIN_WIDTH - editorWidthRef.current;
     } else {
@@ -4577,7 +4593,7 @@ function HtmlViewer({
     }
     event.preventDefault();
 
-    const r = redistributeWidths(side, delta, layersWidthRef.current, editorWidthRef.current, previewPanelWidthRef.current);
+    const r = redistributeWidths(side, delta, layersWidthRef.current, editorWidthRef.current, currentPreview);
     layersWidthRef.current = r.layers;
     setLayersWidth(r.layers);
     editorWidthRef.current = r.editor;
