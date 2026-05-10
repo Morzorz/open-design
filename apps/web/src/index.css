@@ -14096,7 +14096,7 @@ body.entry-resizing { cursor: col-resize; user-select: none; }
 /* Manual edit mode */
 .manual-edit-workspace {
   display: grid;
-  gap: 10px;
+  gap: var(--manual-edit-gap, 10px);
   height: 100%;
   min-height: 0;
   padding: 10px;

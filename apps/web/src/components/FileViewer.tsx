@@ -151,7 +151,11 @@ const MARKDOWN_COPY_BLOCK_ATTR = 'data-copy-code-block';
 const MARKDOWN_COPY_BUTTON_CLASS = 'markdown-code-copy';
 const MARKDOWN_COPY_TOAST_CLASS = 'markdown-code-toast';
 
-// Manual edit panel resize constants
+// Manual edit panel resize constants.
+// The 5-column grid (3 panels + 2 handles) costs 36px more than the pre-PR
+// 3-column layout: 2 extra gaps (2×10px) + 2 handle columns (2×8px).
+// This is the trade-off for draggable resize handles; on narrow viewports
+// normalizePanelWidths squeezes panels to fit.
 const LAYERS_MIN_WIDTH = 180;
 const LAYERS_DEFAULT_WIDTH = 240;
 const EDITOR_MIN_WIDTH = 280;
@@ -162,7 +166,7 @@ const MANUAL_EDIT_HANDLE_WIDTH = 8;
 const LAYERS_WIDTH_KEY = 'open-design.manualEdit.layersWidth';
 const EDITOR_WIDTH_KEY = 'open-design.manualEdit.editorWidth';
 const PREVIEW_WIDTH_KEY = 'open-design.manualEdit.previewWidth';
-const MANUAL_EDIT_GAP = 10;
+const MANUAL_EDIT_GAP = 10; // Must match --manual-edit-gap fallback in CSS
 const MANUAL_EDIT_KEYBOARD_STEP = 16;
 
 function readSavedWidth(key: string, fallback: number, min: number): number {
@@ -4408,7 +4412,8 @@ function HtmlViewer({
     if (!ws) return;
     const cs = window.getComputedStyle(ws);
     const padH = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
-    const available = ws.clientWidth - padH - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * MANUAL_EDIT_GAP;
+    const gapH = Number.parseFloat(cs.gap) || MANUAL_EDIT_GAP;
+    const available = ws.clientWidth - padH - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * gapH;
     if (available <= 0) return;
     const n = normalizePanelWidths(
       layersWidthRef.current,
@@ -4435,7 +4440,8 @@ function HtmlViewer({
     const reNormalize = () => {
       const cs = window.getComputedStyle(ws);
       const padH = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
-      const available = ws.clientWidth - padH - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * MANUAL_EDIT_GAP;
+      const gapH = Number.parseFloat(cs.gap) || MANUAL_EDIT_GAP;
+      const available = ws.clientWidth - padH - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * gapH;
       if (available <= 0) return;
       const n = normalizePanelWidths(
         layersWidthRef.current,
@@ -4556,13 +4562,16 @@ function HtmlViewer({
     let delta = 0;
     const workspace = workspaceRef.current;
     const isRtl = workspace ? window.getComputedStyle(workspace).direction === 'rtl' : false;
-
+    // Arrow keys move the separator, not the aria-valuenow: ArrowRight = separator
+    // moves right regardless of which side panel the value represents.
     if (event.key === 'ArrowLeft') {
       delta = isRtl ? MANUAL_EDIT_KEYBOARD_STEP : -MANUAL_EDIT_KEYBOARD_STEP;
     } else if (event.key === 'ArrowRight') {
       delta = isRtl ? -MANUAL_EDIT_KEYBOARD_STEP : MANUAL_EDIT_KEYBOARD_STEP;
     } else if (event.key === 'Home') {
       delta = side === 'layers' ? LAYERS_MIN_WIDTH - layersWidthRef.current : previewPanelWidthRef.current - PREVIEW_PANEL_MIN_WIDTH;
+    } else if (event.key === 'End') {
+      delta = side === 'layers' ? editorWidthRef.current - EDITOR_MIN_WIDTH : EDITOR_MIN_WIDTH - editorWidthRef.current;
     } else {
       return;
     }

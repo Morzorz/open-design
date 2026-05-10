@@ -395,7 +395,7 @@ test('manual edit mode applies content, style, attribute, HTML, source, undo, an
   await expect(frame.getByRole('heading', { name: 'Original Hero' })).toBeVisible();
 
   // Dismiss the privacy consent banner so it doesn't intercept clicks
-  // when the layout shifts due to 1fr editor column expansion.
+  // when the layout shifts due to 1fr preview column expansion.
   const consentBanner = page.locator('.privacy-consent-banner');
   await consentBanner.getByRole('button').last().click();
 
