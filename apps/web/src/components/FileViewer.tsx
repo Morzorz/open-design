@@ -4397,10 +4397,13 @@ function HtmlViewer({
   }, []);
 
   // Re-clamp restored widths against the actual workspace width (not viewport).
-  // Runs once: after source loads and manualEditMode makes the workspace visible.
+  // Re-runs each time manual edit mode activates so the current workspace size is measured.
   useLayoutEffect(() => {
+    if (!manualEditMode) {
+      hasNormalizedRef.current = false;
+      return;
+    }
     if (hasNormalizedRef.current) return;
-    if (!manualEditMode) return;
     const ws = workspaceRef.current;
     if (!ws) return;
     const cs = window.getComputedStyle(ws);
