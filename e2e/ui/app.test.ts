@@ -394,6 +394,11 @@ test('manual edit mode applies content, style, attribute, HTML, source, undo, an
   const frame = page.frameLocator('[data-testid="artifact-preview-frame"]');
   await expect(frame.getByRole('heading', { name: 'Original Hero' })).toBeVisible();
 
+  // Dismiss the privacy consent banner so it doesn't intercept clicks
+  // when the layout shifts due to 1fr editor column expansion.
+  const consentBanner = page.locator('.privacy-consent-banner');
+  await consentBanner.getByRole('button').last().click();
+
   await page.getByTestId('manual-edit-mode-toggle').click();
   await frame.getByRole('heading', { name: 'Original Hero' }).click();
   await expect(page.locator('.manual-edit-modal')).toContainText('Hero title');
