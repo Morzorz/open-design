@@ -4431,7 +4431,8 @@ function HtmlViewer({
     if (!manualEditMode) return;
     const ws = workspaceRef.current;
     if (!ws) return;
-    const observer = new ResizeObserver(() => {
+
+    const reNormalize = () => {
       const cs = window.getComputedStyle(ws);
       const padH = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
       const available = ws.clientWidth - padH - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * MANUAL_EDIT_GAP;
@@ -4451,9 +4452,16 @@ function HtmlViewer({
       setEditorWidth(n.editor);
       previewPanelWidthRef.current = n.preview;
       setPreviewPanelWidth(n.preview);
-    });
-    observer.observe(ws);
-    return () => observer.disconnect();
+    };
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(reNormalize);
+      observer.observe(ws);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', reNormalize);
+    return () => window.removeEventListener('resize', reNormalize);
   }, [source, manualEditMode]);
 
   const handleResizePointerDown = useCallback((side: 'layers' | 'preview') => (event: React.PointerEvent<HTMLDivElement>) => {
