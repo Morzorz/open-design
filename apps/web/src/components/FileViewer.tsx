@@ -185,7 +185,7 @@ export function normalizePanelWidths(
   let p = Math.max(PREVIEW_PANEL_MIN_WIDTH, Math.round(preview));
 
   let overflow = l + e + p - available;
-  if (overflow <= 0) return { layers: l, editor: e, preview: p };
+  if (overflow <= 0) return { layers: l, editor: e - overflow, preview: p };
 
   // Squeeze editor first (flexible middle panel), then side panels if still overflowing
   const squeezeE = Math.min(overflow, e - EDITOR_MIN_WIDTH);

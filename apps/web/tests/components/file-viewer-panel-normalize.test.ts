@@ -19,9 +19,13 @@ function availableFromClientWidth(clientWidth: number): number {
 }
 
 describe('normalizePanelWidths', () => {
-  it('returns values unchanged when they fit within available width', () => {
+  it('expands the editor to fill slack when panels fit within available width', () => {
+    // sum = 240 + 420 + 344 = 1004, available = 1200, slack = 196
     const r = normalizePanelWidths(240, 420, 344, 1200);
-    expect(r).toEqual({ layers: 240, editor: 420, preview: 344 });
+    expect(r.layers).toBe(240);
+    expect(r.preview).toBe(344);
+    expect(r.editor).toBe(616); // 420 + 196
+    expect(r.layers + r.editor + r.preview).toBe(1200);
   });
 
   it('does nothing when values already equal available width exactly', () => {
@@ -30,9 +34,14 @@ describe('normalizePanelWidths', () => {
     expect(r).toEqual({ layers: 240, editor: 420, preview: 344 });
   });
 
-  it('lifts values below their minimums even without overflow', () => {
+  it('lifts values below their minimums and expands editor to fill slack', () => {
     const r = normalizePanelWidths(100, 200, 100, 1200);
-    expect(r).toEqual({ layers: LAYERS_MIN, editor: EDITOR_MIN, preview: PREVIEW_MIN });
+    // All three clamped to mins: 180 + 280 + 280 = 740
+    // slack = 1200 - 740 = 460, goes to editor
+    expect(r.layers).toBe(LAYERS_MIN);
+    expect(r.preview).toBe(PREVIEW_MIN);
+    expect(r.editor).toBe(740); // 280 + 460
+    expect(r.layers + r.editor + r.preview).toBe(1200);
   });
 
   it('squeezes the editor first when panels overflow', () => {
@@ -97,11 +106,13 @@ describe('normalizePanelWidths', () => {
     expect(r.layers + r.editor + r.preview).toBe(824);
   });
 
-  it('rounds fractional panel widths', () => {
+  it('rounds fractional panel widths and expands editor to fill available', () => {
     const r = normalizePanelWidths(240.7, 420.3, 344.5, 1200);
     expect(r.layers).toBe(241);
-    expect(r.editor).toBe(420);
     expect(r.preview).toBe(345);
+    // sum = 241+420+345 = 1006, slack = 1200-1006 = 194, editor = 420+194 = 614
+    expect(r.editor).toBe(614);
+    expect(r.layers + r.editor + r.preview).toBe(1200);
   });
 
   it('returns minimums when available is less than sum of minimums', () => {
@@ -169,11 +180,13 @@ describe('normalizePanelWidths — content-box available width with real CSS bud
     expect(availableFromClientWidth(756)).toBe(680); // just above sum of mins
   });
 
-  it('default widths (240+420+344=1004) fit in a 1100px clientWidth workspace', () => {
-    const available = availableFromClientWidth(1100);
+  it('default widths (240+420+344=1004) expand editor to fill 1100px workspace', () => {
+    const available = availableFromClientWidth(1100); // = 1024
     const r = normalizePanelWidths(240, 420, 344, available);
-    expect(r).toEqual({ layers: 240, editor: 420, preview: 344 });
-    expect(r.layers + r.editor + r.preview).toBeLessThanOrEqual(available);
+    expect(r.layers).toBe(240);
+    expect(r.preview).toBe(344);
+    expect(r.editor).toBe(440); // 420 + 20 (slack)
+    expect(r.layers + r.editor + r.preview).toBe(available);
   });
 
   it('large persisted widths on a constrained 850px workspace are clamped', () => {
@@ -194,18 +207,25 @@ describe('normalizePanelWidths — content-box available width with real CSS bud
 
 describe('normalizePanelWidths — workspace resize during active session', () => {
   it('re-normalizes when workspace shrinks mid-session', () => {
-    // Initial: 1100px workspace → default widths (1004) fit in 1024
-    const available1 = availableFromClientWidth(1100);
+    // Initial: 1100px workspace → 1024 available, editor expands to 440
+    const available1 = availableFromClientWidth(1100); // = 1024
     const r1 = normalizePanelWidths(240, 420, 344, available1);
-    expect(r1).toEqual({ layers: 240, editor: 420, preview: 344 });
+    expect(r1.layers).toBe(240);
+    expect(r1.preview).toBe(344);
+    expect(r1.editor).toBe(440); // 420 + 20 slack
+    expect(r1.layers + r1.editor + r1.preview).toBe(available1);
 
     // User drags chat split wider → workspace shrinks to 850px → 774
     const available2 = availableFromClientWidth(850);
     const r2 = normalizePanelWidths(r1.layers, r1.editor, r1.preview, available2);
-    expect(r2.layers + r2.editor + r2.preview).toBeLessThanOrEqual(available2);
-    expect(r2.layers).toBeGreaterThanOrEqual(LAYERS_MIN);
-    expect(r2.editor).toBeGreaterThanOrEqual(EDITOR_MIN);
-    expect(r2.preview).toBeGreaterThanOrEqual(PREVIEW_MIN);
+    // sum = 240+440+344=1024, overflow = 1024-774=250
+    // editor: 440→280 (160), overflow=90
+    // layers: 240→180 (60), overflow=30
+    // preview: 344→314 (30)
+    expect(r2.layers).toBe(LAYERS_MIN); // 180
+    expect(r2.editor).toBe(EDITOR_MIN); // 280
+    expect(r2.preview).toBe(314);
+    expect(r2.layers + r2.editor + r2.preview).toBe(available2);
   });
 
   it('is idempotent when workspace width does not change', () => {
