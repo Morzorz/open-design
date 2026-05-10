@@ -191,3 +191,27 @@ describe('normalizePanelWidths — content-box available width with real CSS bud
     expect(r.preview).toBeGreaterThanOrEqual(PREVIEW_MIN);
   });
 });
+
+describe('normalizePanelWidths — workspace resize during active session', () => {
+  it('re-normalizes when workspace shrinks mid-session', () => {
+    // Initial: 1100px workspace → default widths (1004) fit in 1024
+    const available1 = availableFromClientWidth(1100);
+    const r1 = normalizePanelWidths(240, 420, 344, available1);
+    expect(r1).toEqual({ layers: 240, editor: 420, preview: 344 });
+
+    // User drags chat split wider → workspace shrinks to 850px → 774
+    const available2 = availableFromClientWidth(850);
+    const r2 = normalizePanelWidths(r1.layers, r1.editor, r1.preview, available2);
+    expect(r2.layers + r2.editor + r2.preview).toBeLessThanOrEqual(available2);
+    expect(r2.layers).toBeGreaterThanOrEqual(LAYERS_MIN);
+    expect(r2.editor).toBeGreaterThanOrEqual(EDITOR_MIN);
+    expect(r2.preview).toBeGreaterThanOrEqual(PREVIEW_MIN);
+  });
+
+  it('is idempotent when workspace width does not change', () => {
+    const available = availableFromClientWidth(1100);
+    const r1 = normalizePanelWidths(240, 420, 344, available);
+    const r2 = normalizePanelWidths(r1.layers, r1.editor, r1.preview, available);
+    expect(r2).toEqual(r1);
+  });
+});

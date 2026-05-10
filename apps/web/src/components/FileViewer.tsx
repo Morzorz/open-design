@@ -4425,6 +4425,37 @@ function HtmlViewer({
     hasNormalizedRef.current = true;
   }, [source, manualEditMode]);
 
+  // Re-normalize when workspace width changes during an active manual-edit session
+  // (e.g., user drags the ProjectView chat/workspace split).
+  useEffect(() => {
+    if (!manualEditMode) return;
+    const ws = workspaceRef.current;
+    if (!ws) return;
+    const observer = new ResizeObserver(() => {
+      const cs = window.getComputedStyle(ws);
+      const padH = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
+      const available = ws.clientWidth - padH - MANUAL_EDIT_HANDLE_WIDTH * 2 - 4 * MANUAL_EDIT_GAP;
+      if (available <= 0) return;
+      const n = normalizePanelWidths(
+        layersWidthRef.current,
+        editorWidthRef.current,
+        previewPanelWidthRef.current,
+        available,
+      );
+      if (n.layers === layersWidthRef.current
+        && n.editor === editorWidthRef.current
+        && n.preview === previewPanelWidthRef.current) return;
+      layersWidthRef.current = n.layers;
+      setLayersWidth(n.layers);
+      editorWidthRef.current = n.editor;
+      setEditorWidth(n.editor);
+      previewPanelWidthRef.current = n.preview;
+      setPreviewPanelWidth(n.preview);
+    });
+    observer.observe(ws);
+    return () => observer.disconnect();
+  }, [source, manualEditMode]);
+
   const handleResizePointerDown = useCallback((side: 'layers' | 'preview') => (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const workspace = workspaceRef.current;
