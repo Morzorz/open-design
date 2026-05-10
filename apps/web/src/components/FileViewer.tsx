@@ -5042,7 +5042,7 @@ function HtmlViewer({
           <div
             className={manualEditMode ? `manual-edit-workspace${resizingPanel ? ' is-resizing' : ''}` : 'comment-preview-layer'}
             ref={workspaceRef}
-            style={manualEditMode ? { gridTemplateColumns: `${layersWidth}px ${MANUAL_EDIT_HANDLE_WIDTH}px minmax(${editorWidth}px, 1fr) ${MANUAL_EDIT_HANDLE_WIDTH}px ${previewPanelWidth}px` } : undefined}
+            style={manualEditMode ? { gridTemplateColumns: `${layersWidth}px ${MANUAL_EDIT_HANDLE_WIDTH}px ${editorWidth}px ${MANUAL_EDIT_HANDLE_WIDTH}px ${previewPanelWidth}px` } : undefined}
           >
             {manualEditMode ? (
               <>
