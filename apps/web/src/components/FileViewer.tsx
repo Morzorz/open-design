@@ -4400,6 +4400,7 @@ function HtmlViewer({
   // Runs once: after source loads and manualEditMode makes the workspace visible.
   useLayoutEffect(() => {
     if (hasNormalizedRef.current) return;
+    if (!manualEditMode) return;
     const ws = workspaceRef.current;
     if (!ws) return;
     const cs = window.getComputedStyle(ws);
