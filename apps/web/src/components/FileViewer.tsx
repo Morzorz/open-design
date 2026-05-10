@@ -4488,12 +4488,13 @@ function HtmlViewer({
 
     const startLayers = layersWidthRef.current;
     const startEditor = editorWidthRef.current;
+    const restorePreview = previewPanelWidthRef.current;
     // The preview column uses minmax(previewPanelWidth, 1fr), so its rendered
     // width may exceed the state value on wide workspaces. Measure the actual
     // width so redistributeWidths computes correct deltas during drag.
-    const startPreview = side === 'preview'
-      ? measureActualPreviewWidth(workspace, previewPanelWidthRef.current)
-      : previewPanelWidthRef.current;
+    const resizePreview = side === 'preview'
+      ? measureActualPreviewWidth(workspace, restorePreview)
+      : restorePreview;
 
     const applyWidths = (layers: number, editor: number, preview: number) => {
       layersWidthRef.current = layers;
@@ -4510,7 +4511,7 @@ function HtmlViewer({
       let delta = clientX - st.startClientX;
       if (st.isRtl) delta = -delta;
 
-      const r = redistributeWidths(side, delta, startLayers, startEditor, startPreview);
+      const r = redistributeWidths(side, delta, startLayers, startEditor, resizePreview);
       applyWidths(r.layers, r.editor, r.preview);
     };
 
@@ -4536,7 +4537,7 @@ function HtmlViewer({
       startClientX: event.clientX,
       startLayers,
       startEditor,
-      startPreview,
+      startPreview: resizePreview,
       side,
       isRtl: window.getComputedStyle(workspace).direction === 'rtl',
     };
@@ -4547,7 +4548,7 @@ function HtmlViewer({
       pointerFrameRef.current = requestAnimationFrame(() => { pointerFrameRef.current = null; flushMove(); });
     };
     const onEnd = () => { flushMove(); saveWidths(); setResizingPanel(null); pointerCleanupRef.current?.(); pointerCleanupRef.current = null; };
-    const onCancel = () => { flushMove(); applyWidths(startLayers, startEditor, startPreview); setResizingPanel(null); pointerCleanupRef.current?.(); pointerCleanupRef.current = null; };
+    const onCancel = () => { flushMove(); applyWidths(startLayers, startEditor, restorePreview); setResizingPanel(null); pointerCleanupRef.current?.(); pointerCleanupRef.current = null; };
     const cleanup = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onEnd);
