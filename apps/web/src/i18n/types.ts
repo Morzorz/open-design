@@ -112,6 +112,13 @@ export interface Dict {
   'settings.testAgentMissing': string;
   'settings.testAgentSpawn': string;
   'settings.testUnknown': string;
+  'settings.agentInstall.install': string;
+  'settings.agentInstall.docs': string;
+  'settings.agentInstall.pathHint': string;
+  'settings.agentInstall.stepOpenLinks': string;
+  'settings.agentInstall.stepAuth': string;
+  'settings.agentInstall.stepRescan': string;
+  'settings.agentInstall.stepSelect': string;
   'settings.noAgentsDetected': string;
   'settings.apiSection': string;
   'settings.quickFillProvider': string;
@@ -122,6 +129,13 @@ export interface Dict {
   'settings.show': string;
   'settings.hide': string;
   'settings.model': string;
+  'settings.fetchModels': string;
+  'settings.fetchModelsTitle': string;
+  'settings.fetchModelsRunning': string;
+  'settings.fetchModelsSuccess': string;
+  'settings.fetchModelsEmpty': string;
+  'settings.fetchModelsUnsupported': string;
+  'settings.fetchModelsFailed': string;
   'settings.suggestedModelsHint': string;
   'settings.maxTokens': string;
   'settings.maxTokensHint': string;
@@ -129,6 +143,7 @@ export interface Dict {
   'settings.baseUrlInvalid': string;
   'settings.azureDeploymentModel': string;
   'settings.azureDeploymentModelHint': string;
+  'settings.azureModelFetchHint': string;
   'settings.apiVersion': string;
   'settings.apiHint': string;
   'settings.skipForNow': string;
@@ -169,6 +184,10 @@ export interface Dict {
   'settings.mediaProviderClearConfirm': string;
   'settings.mediaProviderPlaceholder': string;
   'settings.mediaProviderBaseUrlPlaceholder': string;
+  'settings.mediaProviderReload': string;
+  'settings.mediaProviderReloadError': string;
+  'settings.mediaProviderReloadSuccess': string;
+  'settings.mediaProviderLoadError': string;
   'settings.privacy': string;
   'settings.privacyHint': string;
   'settings.privacyConsentKicker': string;
@@ -196,8 +215,24 @@ export interface Dict {
   'settings.runtimePackaged': string;
   'settings.runtimeDevelopment': string;
   'settings.versionUnavailable': string;
-  'settings.library': string;
-  'settings.libraryHint': string;
+  'settings.skills': string;
+  'settings.skillsHint': string;
+  'settings.skillsNew': string;
+  'settings.skillsEmpty': string;
+  'settings.skillsEdit': string;
+  'settings.skillsDelete': string;
+  'settings.skillsDeleteConfirm': string;
+  'settings.skillsName': string;
+  'settings.skillsTriggers': string;
+  'settings.skillsDescription': string;
+  'settings.skillsBody': string;
+  'settings.skillsCreate': string;
+  'settings.skillsSave': string;
+  'settings.skillsSaving': string;
+  'settings.skillsFiles': string;
+  'settings.skillsNoFiles': string;
+  'settings.designSystems': string;
+  'settings.designSystemsHint': string;
   'settings.librarySkills': string;
   'settings.libraryDesignSystems': string;
   'settings.librarySearch': string;
@@ -209,6 +244,15 @@ export interface Dict {
   'settings.libraryEnabled': string;
   'settings.libraryDisabled': string;
   'settings.libraryToggleLabel': string;
+  'settings.libraryInstall': string;
+  'settings.libraryInstallGithub': string;
+  'settings.libraryInstallLocal': string;
+  'settings.libraryInstallUrl': string;
+  'settings.libraryInstallPath': string;
+  'settings.libraryInstallButton': string;
+  'settings.libraryUninstall': string;
+  'settings.libraryBuiltIn': string;
+  'settings.libraryInstalled': string;
   'settings.connectorsNavHint': string;
   'settings.connectorsHint': string;
   'settings.connectorsComposioApiKey': string;
@@ -301,6 +345,130 @@ export interface Dict {
   'settings.orbit.controlsLockedBadge': string;
   'settings.orbit.controlsLockedHint': string;
 
+  // Memory (auto-extracted personalization saved as on-disk markdown)
+  'settings.memory': string;
+  'settings.memoryHint': string;
+  'settings.memoryDescription': string;
+  'settings.memoryEnabled': string;
+  'settings.memoryDisabled': string;
+  'settings.memoryEnableLabel': string;
+  'settings.memoryDisabledBanner': string;
+  'settings.memoryNew': string;
+  'settings.memoryEdit': string;
+  'settings.memoryDelete': string;
+  'settings.memoryPreview': string;
+  'settings.memoryEmpty': string;
+  'settings.memoryEmptyHintZh': string;
+  'settings.memoryEmptyHintEn': string;
+  'settings.memoryName': string;
+  'settings.memoryDesc': string;
+  'settings.memoryBody': string;
+  'settings.memoryBodyHint': string;
+  'settings.memoryStartersLabel': string;
+  'settings.memoryStarterUserName': string;
+  'settings.memoryStarterUserDesc': string;
+  'settings.memoryStarterUserBody': string;
+  'settings.memoryStarterFeedbackName': string;
+  'settings.memoryStarterFeedbackDesc': string;
+  'settings.memoryStarterFeedbackBody': string;
+  'settings.memoryStarterProjectName': string;
+  'settings.memoryStarterProjectDesc': string;
+  'settings.memoryStarterProjectBody': string;
+  'settings.memorySaveHint': string;
+  'settings.memoryIndexSaveHint': string;
+  'settings.memoryIndexUnsaved': string;
+  'settings.memoryFlashCreated': string;
+  'settings.memoryFlashSaved': string;
+  'settings.memoryFlashDeleted': string;
+  'settings.memoryFlashIndexSaved': string;
+  'settings.memoryNameLabel': string;
+  'settings.memoryTypeLabel': string;
+  'settings.memoryDescLabel': string;
+  'settings.memoryBodyLabel': string;
+  'settings.memoryTypeUser': string;
+  'settings.memoryTypeFeedback': string;
+  'settings.memoryTypeProject': string;
+  'settings.memoryTypeReference': string;
+  'settings.memoryIndex': string;
+  'settings.memoryIndexSave': string;
+  'settings.memoryIndexReset': string;
+  'settings.memoryToastChanged': string;
+  'settings.memoryToastClickHint': string;
+  'settings.memoryAll': string;
+  // Memory → LLM extraction observability
+  'settings.memoryExtractions': string;
+  'settings.memoryExtractionsHint': string;
+  'settings.memoryExtractionsEmpty': string;
+  'settings.memoryExtractionsRefresh': string;
+  'settings.memoryExtractionPhaseRunning': string;
+  'settings.memoryExtractionPhaseSuccess': string;
+  'settings.memoryExtractionPhaseSkipped': string;
+  'settings.memoryExtractionPhaseFailed': string;
+  'settings.memoryExtractionSkipNoProvider': string;
+  'settings.memoryExtractionSkipDisabled': string;
+  'settings.memoryExtractionSkipEmpty': string;
+  'settings.memoryExtractionSkipNoMatch': string;
+  'settings.memoryExtractionKindHeuristic': string;
+  'settings.memoryExtractionKindLlm': string;
+  'settings.memoryExtractionProviderEnv': string;
+  'settings.memoryExtractionProviderMediaConfig': string;
+  'settings.memoryExtractionProviderOverride': string;
+  'settings.memoryExtractionProposed': string;
+  'settings.memoryExtractionWritten': string;
+  'settings.memoryExtractionDuration': string;
+  'settings.memoryExtractionDelete': string;
+  'settings.memoryExtractionsClear': string;
+  'settings.memoryExtractionsClearTitle': string;
+  'settings.memoryNoProviderBannerTitle': string;
+  'settings.memoryNoProviderBannerBody': string;
+  // Memory model picker — rendered inline next to the chat model picker
+  // so picking "the fast model that mines facts each turn" lives in the
+  // same row as the chat agent + model. Reuses the surrounding chat
+  // protocol/CLI context (key, baseUrl, apiVersion); the user only
+  // chooses the model id.
+  'settings.memoryModelInlineLabel': string;
+  'settings.memoryModelInlineSameAsChat': string;
+  'settings.memoryModelInlineSameAsChatWithModel': string;
+  'settings.memoryModelInlineSameAsChatWithProvider': string;
+  'settings.memoryModelInlineHintCli': string;
+  'settings.memoryModelInlineHintCliConstrained': string;
+  'settings.memoryModelInlineHintByok': string;
+  'settings.memoryModelInlineFlashSaved': string;
+  'settings.memoryModelInlineFlashCleared': string;
+
+  // MCP server settings
+  'settings.mcpTitle': string;
+  'settings.mcpHint': string;
+  'settings.mcpDaemonError': string;
+  'settings.mcpBuildDaemon': string;
+  'settings.mcpNodeMissing': string;
+  'settings.mcpBuildHint': string;
+  'settings.mcpMethodCli': string;
+  'settings.mcpInstructionCli': string;
+  'settings.mcpMethodToml': string;
+  'settings.mcpInstructionCodex': string;
+  'settings.mcpMethodOneClick': string;
+  'settings.mcpInstructionCursor': string;
+  'settings.mcpDeeplinkInstallCursor': string;
+  'settings.mcpMethodJson': string;
+  'settings.mcpInstructionCopilot': string;
+  'settings.mcpInstructionAntigravity': string;
+  'settings.mcpInstructionZed': string;
+  'settings.mcpInstructionWindsurf': string;
+  'settings.mcpCopyAria': string;
+  'settings.mcpResolvingFailed': string;
+  'settings.mcpLoadingPaths': string;
+  'settings.mcpCopied': string;
+  'settings.mcpCopy': string;
+  'settings.mcpCursorApproval': string;
+  'settings.mcpRestartNote': string;
+  'settings.mcpRestartDetail': string;
+  'settings.mcpCapabilitiesTitle': string;
+  'settings.mcpCapabilityRead': string;
+  'settings.mcpCapabilityPull': string;
+  'settings.mcpCapabilityDefault': string;
+  'settings.mcpRunningNote': string;
+
   // Notifications (settings + system notifications)
   'settings.notifications': string;
   'settings.notificationsHint': string;
@@ -329,7 +497,7 @@ export interface Dict {
 
   // Entry view / tabs
   'entry.tabDesigns': string;
-  'entry.tabExamples': string;
+  'entry.tabTemplates': string;
   'entry.tabDesignSystems': string;
   'entry.tabConnectors': string;
   'entry.tabImageTemplates': string;
@@ -623,6 +791,12 @@ export interface Dict {
   'examples.previewModalTitle': string;
   'examples.shareTitle': string;
   'examples.shareLoadFirst': string;
+  // Card placeholder + share-button hint for skills whose
+  // `od.preview.type` is not `html` (image / markdown / …) so the
+  // gallery doesn't sit on a forever "Loading preview…" shimmer for
+  // skills that ship no fetchable artifact. Issue #897.
+  'examples.unavailablePlaceholder': string;
+  'examples.shareUnavailable': string;
   'examples.shareMenu': string;
   'examples.exportPdfAllSlides': string;
   'examples.exportPptxLocked': string;
@@ -752,6 +926,13 @@ export interface Dict {
   'preview.errorTitle': string;
   'preview.errorBody': string;
   'preview.retry': string;
+  // Friendly placeholder copy for skills whose `od.preview.type` is not
+  // `html` — they ship no fetchable example artifact, so the loading /
+  // error states are misleading. Issue #897.
+  'preview.unavailableTitle': string;
+  // Body copy uses the `{kind}` placeholder (raw `od.preview.type`
+  // token, e.g. "markdown" or "image") so each kind reads naturally.
+  'preview.unavailableBody': string;
   'preview.showSidebar': string;
   'preview.hideSidebar': string;
 
@@ -800,12 +981,22 @@ export interface Dict {
   'designFiles.previewClose': string;
   'designFiles.modified': string;
   'designFiles.weeksAgo': string;
+  'designFiles.groupBy': string;
+  'designFiles.groupByKind': string;
+  'designFiles.groupByModified': string;
+  'designFiles.expandGroup': string;
+  'designFiles.collapseGroup': string;
   'designFiles.sectionPages': string;
   'designFiles.sectionScripts': string;
   'designFiles.sectionImages': string;
   'designFiles.sectionSketches': string;
   'designFiles.sectionLiveArtifacts': string;
   'designFiles.sectionOther': string;
+  'designFiles.modifiedToday': string;
+  'designFiles.modifiedYesterday': string;
+  'designFiles.modifiedPrevious7Days': string;
+  'designFiles.modifiedPrevious30Days': string;
+  'designFiles.modifiedOlder': string;
   'designFiles.showMore': string;
   'designFiles.kindHtml': string;
   'designFiles.kindImage': string;
@@ -1102,6 +1293,8 @@ export interface Dict {
   'assistant.role': string;
   'assistant.workingLabel': string;
   'assistant.doneLabel': string;
+  'assistant.emptyResponseLabel': string;
+  'assistant.emptyResponseMessage': string;
   'assistant.unfinishedLabel': string;
   'assistant.unfinishedSummary': string;
   'assistant.unfinishedMore': string;

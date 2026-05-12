@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ConnectorDetail } from '@open-design/contracts';
+import type { ConnectorDetail, ImportFolderResponse } from '@open-design/contracts';
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      openExternal?: (url: string) => Promise<boolean>;
-      pickFolder?: () => Promise<string | null>;
-    };
-  }
-}
+// Window.electronAPI is declared globally in apps/web/src/types/electron.d.ts
+// so the new openPath + pickAndImport methods (#451 / PR #974) and
+// existing openExternal stay in one place. PR #974 deleted the raw
+// `pickFolder` bridge: the renderer no longer receives a filesystem
+// path from the main process, only the daemon's import response.
 
 import { useT } from '../i18n';
 import type { Dict } from '../i18n/types';
 import { fetchPromptTemplate } from '../providers/registry';
+import { isStoredMediaProviderEntryPresent } from '../state/config';
 import type {
   AudioKind,
   DesignSystemSummary,
@@ -39,6 +37,37 @@ import {
 } from '../media/models';
 import { Icon } from './Icon';
 import { Skeleton } from './Loading';
+import { Toast } from './Toast';
+
+/**
+ * Best-effort flattening of the `details` field that the
+ * pickAndImport main-process handler attaches when the daemon returned
+ * a structured error envelope (PR #974 round-4 mrcfps). Daemon errors
+ * carry `error.message` and sometimes nested `error.details.reason`;
+ * we surface the most operator-actionable string we can find without
+ * over-coupling to any particular error code.
+ */
+function formatPickAndImportErrorDetails(details: unknown): string | undefined {
+  if (typeof details === 'string' && details.length > 0) return details;
+  if (details == null || typeof details !== 'object') return undefined;
+  const record = details as Record<string, unknown>;
+  const error = record.error;
+  if (error != null && typeof error === 'object') {
+    const errRecord = error as Record<string, unknown>;
+    const message = errRecord.message;
+    const nestedDetails = errRecord.details;
+    if (typeof message === 'string' && message.length > 0) {
+      if (nestedDetails != null && typeof nestedDetails === 'object') {
+        const nestedReason = (nestedDetails as Record<string, unknown>).reason;
+        if (typeof nestedReason === 'string' && nestedReason.length > 0) {
+          return `${message} (${nestedReason})`;
+        }
+      }
+      return message;
+    }
+  }
+  return undefined;
+}
 
 // Snapshot of a curated prompt template, captured at New Project time and
 // folded into ProjectMetadata.promptTemplate. The user may have edited the
@@ -67,7 +96,17 @@ interface Props {
   promptTemplates: PromptTemplateSummary[];
   onCreate: (input: CreateInput) => void;
   onImportClaudeDesign?: (file: File) => Promise<void> | void;
+  // Web fallback: the user types an absolute baseDir into the manual
+  // input and the renderer POSTs `/api/import/folder` itself. Browser
+  // builds have no `shell.openPath` surface, so the renderer naming a
+  // path here cannot escalate (PR #974 trust model).
   onImportFolder?: (baseDir: string) => Promise<void> | void;
+  // Electron flow: the desktop main process owns the picker dialog and
+  // the import call atomically (`pickAndImport` IPC). The renderer
+  // never sees the path or the HMAC token; it only receives the
+  // daemon's import response and forwards it here so App-level state
+  // can update without a second fetch.
+  onImportFolderResponse?: (response: ImportFolderResponse) => Promise<void> | void;
   mediaProviders?: Record<string, MediaProviderCredentials>;
   connectors?: ConnectorDetail[];
   connectorsLoading?: boolean;
@@ -117,6 +156,7 @@ export function NewProjectPanel({
   onCreate,
   onImportClaudeDesign,
   onImportFolder,
+  onImportFolderResponse,
   mediaProviders,
   connectors,
   connectorsLoading = false,
@@ -128,6 +168,14 @@ export function NewProjectPanel({
   const [importing, setImporting] = useState(false);
   const [baseDir, setBaseDir] = useState('');
   const [importingFolder, setImportingFolder] = useState(false);
+  // PR #974 round-4 (mrcfps): pickAndImport now returns structured
+  // failure shapes (`desktop auth secret not registered`, `web sidecar
+  // URL not available`, `daemon returned HTTP X`) — surfacing them
+  // gives the user a recovery hint instead of a silent no-op.
+  // Shape: `{ message, details? }`. `null` means no toast.
+  const [importFolderError, setImportFolderError] = useState<
+    { message: string; details?: string } | null
+  >(null);
   const [tab, setTab] = useState<CreateTab>('prototype');
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const [tabScroll, setTabScroll] = useState({ left: false, right: false });
@@ -157,6 +205,7 @@ export function NewProjectPanel({
   const [imageAspect, setImageAspect] = useState<MediaAspect>('1:1');
   const [imageStyle, setImageStyle] = useState('');
   const [videoModel, setVideoModel] = useState(DEFAULT_VIDEO_MODEL);
+  const [videoModelTouched, setVideoModelTouched] = useState(false);
   const [videoAspect, setVideoAspect] = useState<MediaAspect>('16:9');
   const [videoLength, setVideoLength] = useState(5);
   const [audioKind, setAudioKind] = useState<AudioKind>('speech');
@@ -264,12 +313,76 @@ export function NewProjectPanel({
     }
     if (tab === 'image' || tab === 'video' || tab === 'audio') {
       const list = skills.filter((s) => s.mode === tab || s.surface === tab);
+      // The HyperFrames-HTML render path lives in the `hyperframes` skill.
+      // When the user has chosen `hyperframes-html` (via dropdown or template),
+      // pin the project to that skill explicitly — otherwise this branch falls
+      // back to `list[0]`, which is unsorted (apps/daemon/src/skills.ts builds
+      // the list from `readdir()`), so the project could route through
+      // `video-shortform` while metadata still says `videoModel: 'hyperframes-html'`.
+      if (tab === 'video' && videoModel === 'hyperframes-html') {
+        const hyper = list.find((s) => s.id === 'hyperframes');
+        if (hyper) return hyper.id;
+      }
       return list.find((s) => s.defaultFor.includes(tab))?.id
         ?? list[0]?.id
         ?? null;
     }
     return null;
-  }, [tab, skills]);
+  }, [tab, skills, videoModel]);
+
+  // When the user picks a curated prompt template, propagate the template's
+  // declared `model` and `aspect` onto the actual project state. Without
+  // this the user picks (e.g.) a HyperFrames template but `videoModel`
+  // stays on the default seedance — the agent then dispatches the wrong
+  // model and the render path mismatches the prompt.
+  function handleImagePromptTemplate(pick: PromptTemplatePick | null) {
+    setImagePromptTemplate(pick);
+    const m = pick?.summary.model;
+    if (m && IMAGE_MODELS.some((x) => x.id === m)) setImageModel(m);
+    const a = pick?.summary.aspect;
+    if (a && (MEDIA_ASPECTS as readonly string[]).includes(a)) {
+      setImageAspect(a as MediaAspect);
+    }
+  }
+  function handleVideoPromptTemplate(pick: PromptTemplatePick | null) {
+    setVideoPromptTemplate(pick);
+    const m = pick?.summary.model;
+    if (m && VIDEO_MODELS.some((x) => x.id === m)) {
+      setVideoModel(m);
+      setVideoModelTouched(true);
+    }
+    const a = pick?.summary.aspect;
+    if (a && (MEDIA_ASPECTS as readonly string[]).includes(a)) {
+      setVideoAspect(a as MediaAspect);
+    }
+  }
+  function handleVideoModel(id: string) {
+    setVideoModel(id);
+    setVideoModelTouched(true);
+  }
+
+  // The HyperFrames skill renders HTML compositions through a local
+  // `npx hyperframes render` path, which dispatches under the
+  // `hyperframes-html` model — not seedance/veo/sora. When the resolved
+  // skill for the video tab is hyperframes, default `videoModel` so the
+  // model dropdown matches the actual render path. Once the user has
+  // explicitly chosen a model (via the dropdown or by picking a template
+  // that declares a model), `videoModelTouched` latches and this effect
+  // becomes a no-op for the rest of the panel session — re-entering the
+  // Video tab no longer silently rewrites their override back to
+  // hyperframes-html.
+  useEffect(() => {
+    if (tab !== 'video') return;
+    if (skillIdForTab !== 'hyperframes') return;
+    if (videoModelTouched) return;
+    if (videoPromptTemplate) return;
+    if (!VIDEO_MODELS.some((m) => m.id === 'hyperframes-html')) return;
+    setVideoModel('hyperframes-html');
+    // Intentionally leaving videoPromptTemplate / videoModel out of deps
+    // so this only fires when the user toggles the tab or the skill
+    // resolution shifts — not whenever the user changes the dropdown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, skillIdForTab, videoModelTouched]);
 
   const canCreate =
     !loading && (tab !== 'template' || templateId != null);
@@ -373,24 +486,56 @@ export function NewProjectPanel({
     }
   }
 
-  const hasElectronPicker =
-    typeof window !== 'undefined' && typeof window.electronAPI?.pickFolder === 'function';
+  // PR #974: the bridge no longer exposes `pickFolder` (raw path
+  // crossing to the renderer). The Electron flow now uses
+  // `pickAndImport`, which performs the picker + the HMAC-gated import
+  // atomically in the main process and returns the daemon response.
+  // The web fallback continues to use the manual baseDir input —
+  // browser builds have no `shell.openPath` surface so a renderer-named
+  // path cannot escalate.
+  const hasElectronPickAndImport =
+    typeof window !== 'undefined' && typeof window.electronAPI?.pickAndImport === 'function';
 
   async function handleOpenFolder() {
-    if (!onImportFolder) return;
-    let pathToOpen: string;
-    if (hasElectronPicker) {
-      const picked = await window.electronAPI!.pickFolder!();
-      if (!picked) return;
-      pathToOpen = picked;
-    } else {
-      const trimmed = baseDir.trim();
-      if (!trimmed) return;
-      pathToOpen = trimmed;
+    if (hasElectronPickAndImport) {
+      if (!onImportFolderResponse) return;
+      setImportFolderError(null);
+      setImportingFolder(true);
+      try {
+        const result = await window.electronAPI!.pickAndImport!();
+        if (!result) return;
+        if (result.ok === true) {
+          await onImportFolderResponse(result.response);
+          return;
+        }
+        // Round-4 (mrcfps #2): every non-OK shape used to fall through
+        // a silent `return`. Reserve silent for the explicit cancel
+        // case; surface the structured reason for everything else
+        // (auth-not-registered, web-sidecar-down, daemon HTTP errors,
+        // network errors). The pickAndImport handler already pre-shapes
+        // these into a `{ ok: false, reason, details? }` envelope.
+        if ('canceled' in result && result.canceled === true) return;
+        const reason = 'reason' in result && typeof result.reason === 'string'
+          ? result.reason
+          : 'unknown failure';
+        const details = 'details' in result && result.details != null
+          ? formatPickAndImportErrorDetails(result.details)
+          : undefined;
+        setImportFolderError({
+          message: `Open folder failed: ${reason}`,
+          ...(details ? { details } : {}),
+        });
+      } finally {
+        setImportingFolder(false);
+      }
+      return;
     }
+    if (!onImportFolder) return;
+    const trimmed = baseDir.trim();
+    if (!trimmed) return;
     setImportingFolder(true);
     try {
-      await onImportFolder(pathToOpen);
+      await onImportFolder(trimmed);
     } finally {
       setImportingFolder(false);
     }
@@ -468,7 +613,7 @@ export function NewProjectPanel({
             surface="image"
             templates={promptTemplates}
             value={imagePromptTemplate}
-            onChange={setImagePromptTemplate}
+            onChange={handleImagePromptTemplate}
           />
         ) : null}
 
@@ -477,7 +622,7 @@ export function NewProjectPanel({
             surface="video"
             templates={promptTemplates}
             value={videoPromptTemplate}
-            onChange={setVideoPromptTemplate}
+            onChange={handleVideoPromptTemplate}
           />
         ) : null}
 
@@ -538,7 +683,7 @@ export function NewProjectPanel({
             videoAspect={videoAspect}
             videoLength={videoLength}
             mediaProviders={mediaProviders}
-            onVideoModel={setVideoModel}
+            onVideoModel={handleVideoModel}
             onVideoAspect={setVideoAspect}
             onVideoLength={setVideoLength}
           />
@@ -607,9 +752,9 @@ export function NewProjectPanel({
             </button>
           </>
         ) : null}
-        {onImportFolder ? (
+        {(hasElectronPickAndImport ? onImportFolderResponse : onImportFolder) ? (
           <div className="newproj-open-folder">
-            {!hasElectronPicker ? (
+            {!hasElectronPickAndImport ? (
               <input
                 type="text"
                 className="newproj-folder-input"
@@ -623,7 +768,7 @@ export function NewProjectPanel({
             <button
               type="button"
               className="ghost newproj-import"
-              disabled={(!hasElectronPicker && !baseDir.trim()) || importingFolder}
+              disabled={(!hasElectronPickAndImport && !baseDir.trim()) || importingFolder}
               onClick={() => void handleOpenFolder()}
             >
               <Icon name="folder" size={13} />
@@ -633,6 +778,14 @@ export function NewProjectPanel({
         ) : null}
       </div>
       <div className="newproj-footer">{t('newproj.privacyFooter')}</div>
+      {importFolderError ? (
+        <Toast
+          message={importFolderError.message}
+          details={importFolderError.details ?? null}
+          ttlMs={6000}
+          onDismiss={() => setImportFolderError(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1430,7 +1583,7 @@ function DesignSystemPicker({
               </button>
             </div>
           </div>
-          <div className="ds-picker-list">
+          <div className="ds-picker-list ds-picker-list-design-systems">
             <DsPickerItem
               active={selectedIds.length === 0}
               multi={multi}
@@ -1755,7 +1908,8 @@ function MediaModelCards({
     const provider = findProvider(model.provider);
     const providerId = provider?.id ?? model.provider;
     const entry = mediaProviders?.[providerId];
-    const configured = provider?.credentialsRequired === false || Boolean(entry?.apiKey.trim() || entry?.baseUrl.trim());
+    const configured = provider?.credentialsRequired === false
+      || isStoredMediaProviderEntryPresent(entry);
     let group = groups.find((g) => g.providerId === providerId);
     if (!group) {
       group = {

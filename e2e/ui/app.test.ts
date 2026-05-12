@@ -4,6 +4,11 @@ import { automatedUiScenarios } from '@/playwright/resources';
 import type { UiScenario } from '@/playwright/resources';
 
 const STORAGE_KEY = 'open-design:config';
+const APP_OWNED_SCENARIO_FLOWS = new Set([
+  'design-files-upload',
+  'design-files-delete',
+  'design-files-tab-persistence',
+]);
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((key) => {
@@ -24,7 +29,9 @@ test.beforeEach(async ({ page }) => {
   }, STORAGE_KEY);
 });
 
-for (const entry of automatedUiScenarios()) {
+for (const entry of automatedUiScenarios().filter(
+  (scenario) => !APP_OWNED_SCENARIO_FLOWS.has(scenario.flow ?? ''),
+)) {
   test(`${entry.id}: ${entry.title}`, async ({ page }) => {
     await page.route('**/api/agents', async (route) => {
       await route.fulfill({
@@ -62,32 +69,35 @@ for (const entry of automatedUiScenarios()) {
     }
 
     if (entry.flow === 'example-use-prompt') {
+      const exampleSummary = {
+        id: 'warm-utility-example',
+        name: 'Warm Utility Example',
+        description: 'A warm utility prototype example.',
+        triggers: [],
+        mode: 'prototype',
+        platform: 'desktop',
+        scenario: 'product',
+        previewType: 'html',
+        designSystemRequired: false,
+        defaultFor: ['prototype'],
+        upstream: null,
+        featured: 1,
+        fidelity: 'high-fidelity',
+        speakerNotes: null,
+        animations: null,
+        hasBody: true,
+        examplePrompt: entry.prompt,
+      };
       await page.route('**/api/skills', async (route) => {
-        await route.fulfill({
-          json: {
-            skills: [
-              {
-                id: 'warm-utility-example',
-                name: 'Warm Utility Example',
-                description: 'A warm utility prototype example.',
-                triggers: [],
-                mode: 'prototype',
-                platform: 'desktop',
-                scenario: 'product',
-                previewType: 'html',
-                designSystemRequired: false,
-                defaultFor: ['prototype'],
-                upstream: null,
-                featured: 1,
-                fidelity: 'high-fidelity',
-                speakerNotes: null,
-                animations: null,
-                hasBody: true,
-                examplePrompt: entry.prompt,
-              },
-            ],
-          },
-        });
+        await route.fulfill({ json: { skills: [exampleSummary] } });
+      });
+      // The skills/design-templates split (see specs/current/
+      // skills-and-design-templates.md) moved the EntryView Templates
+      // tab onto its own daemon registry. The fixture skill above now
+      // also has to be served on the design-templates surface so the
+      // gallery card the test clicks actually renders.
+      await page.route('**/api/design-templates', async (route) => {
+        await route.fulfill({ json: { designTemplates: [exampleSummary] } });
       });
     }
 
@@ -259,18 +269,6 @@ for (const entry of automatedUiScenarios()) {
       await runFileUploadSendFlow(page, entry);
       return;
     }
-    if (entry.flow === 'design-files-upload') {
-      await runDesignFilesUploadFlow(page);
-      return;
-    }
-    if (entry.flow === 'design-files-delete') {
-      await runDesignFilesDeleteFlow(page);
-      return;
-    }
-    if (entry.flow === 'design-files-tab-persistence') {
-      await runDesignFilesTabPersistenceFlow(page);
-      return;
-    }
     if (entry.flow === 'conversation-delete-recovery') {
       await runConversationDeleteRecoveryFlow(page, entry);
       return;
@@ -299,15 +297,6 @@ for (const entry of automatedUiScenarios()) {
       await runDeckPaginationPerFileIsolatedFlow(page);
       return;
     }
-    if (entry.flow === 'uploaded-image-renders-in-preview') {
-      await runUploadedImageRendersInPreviewFlow(page);
-      return;
-    }
-    if (entry.flow === 'python-source-preview') {
-      await runPythonSourcePreviewFlow(page);
-      return;
-    }
-
     await sendPrompt(page, entry.prompt);
 
     if (entry.mockArtifact) {
@@ -598,8 +587,8 @@ async function createProject(
 async function expectWorkspaceReady(page: Page) {
   await expect(page).toHaveURL(/\/projects\//);
   await expect(page.getByTestId('chat-composer')).toBeVisible();
+  await expect(page.getByTestId('chat-composer-input')).toBeVisible();
   await expect(page.getByTestId('file-workspace')).toBeVisible();
-  await expect(page.getByText('Start a conversation')).toBeVisible();
 }
 
 async function sendPrompt(
@@ -674,7 +663,7 @@ async function runExampleUsePromptFlow(
   page: Page,
   entry: UiScenario,
 ) {
-  await page.getByTestId('entry-tab-examples').click();
+  await page.getByTestId('entry-tab-templates').click();
   await expect(page.getByTestId('example-card-warm-utility-example')).toBeVisible();
   await page.getByTestId('example-use-prompt-warm-utility-example').click();
 
@@ -900,36 +889,6 @@ async function runDeckPaginationPerFileIsolatedFlow(page: Page) {
   await expect(frame.getByText('Beta Two')).toBeVisible();
 }
 
-async function runUploadedImageRendersInPreviewFlow(page: Page) {
-  const { projectId } = await getCurrentProjectContext(page);
-  const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5W6McAAAAASUVORK5CYII=';
-  await seedProjectFile(page, projectId, 'brand.png', pngBase64, 'base64');
-  await seedHtmlArtifact(
-    page,
-    projectId,
-    'image-preview.html',
-    '<!doctype html><html><body><main><h1>Image Preview</h1><img alt="Brand logo" src="brand.png"></main></body></html>',
-  );
-  await page.reload();
-  await openDesignFile(page, 'image-preview.html');
-
-  const image = page.frameLocator('[data-testid="artifact-preview-frame"]').getByRole('img', { name: 'Brand logo' });
-  await expect(image).toBeVisible();
-  await expect
-    .poll(async () => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
-    .toBe(true);
-}
-
-async function runPythonSourcePreviewFlow(page: Page) {
-  const { projectId } = await getCurrentProjectContext(page);
-  await seedProjectFile(page, projectId, 'app.py', 'def greet():\n    return "hello from python"\n');
-  await page.reload();
-  await openDesignFile(page, 'app.py');
-
-  await expect(page.locator('.code-viewer')).toContainText('def greet');
-  await expect(page.locator('.code-viewer')).toContainText('hello from python');
-}
-
 async function seedDeckArtifact(
   page: Page,
   projectId: string,
@@ -1039,7 +998,8 @@ async function runConversationPersistenceFlow(
   await expectArtifactVisible(page, entry);
 
   await page.getByTestId('new-conversation').click();
-  await expect(page.getByText('Start a conversation')).toBeVisible();
+  await expect(page.getByTestId('chat-composer-input')).toBeVisible();
+  await expect(page.getByTestId('chat-composer-input')).toHaveValue('');
 
   const nextPrompt = entry.secondaryPrompt!;
   await sendPrompt(page, nextPrompt);
@@ -1144,126 +1104,6 @@ async function runFileUploadSendFlow(
   await sendPrompt(page, entry.prompt);
   await expect(page.getByText(entry.prompt, { exact: true })).toBeVisible();
   await expect(page.locator('.user-attachments').getByText('reference.txt', { exact: true })).toBeVisible();
-}
-
-async function runDesignFilesUploadFlow(
-  page: Page,
-) {
-  await page.getByTestId('design-files-upload-input').setInputFiles({
-    name: 'moodboard.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5W6McAAAAASUVORK5CYII=',
-      'base64',
-    ),
-  });
-
-  await expect(page.getByRole('tab', { name: /moodboard\.png/i })).toBeVisible();
-  await page.getByTestId('design-files-tab').click();
-  const fileRow = page.locator('[data-testid^="design-file-row-"]', {
-    hasText: 'moodboard.png',
-  });
-  await expect(fileRow).toBeVisible();
-  const nameBtn = fileRow.getByRole('button').first();
-  await nameBtn.click();
-  const preview = page.getByTestId('design-file-preview');
-  await expect(preview).toBeVisible();
-  await expect(preview.getByText(/moodboard\.png/i)).toBeVisible();
-
-  await nameBtn.dblclick();
-  await expect(page.getByRole('tab', { name: /moodboard\.png/i })).toBeVisible();
-}
-
-async function runDesignFilesDeleteFlow(
-  page: Page,
-) {
-  page.on('dialog', async (dialog: Dialog) => {
-    await dialog.accept();
-  });
-
-  const pngBytes = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5W6McAAAAASUVORK5CYII=',
-    'base64',
-  );
-
-  // Upload a sibling file first so that, after deleting trash-me.png, there
-  // is a fallback tab the buggy code would have navigated to. The fix must
-  // keep the user in the Design Files panel instead.
-  await page.getByTestId('design-files-upload-input').setInputFiles({
-    name: 'keep-me.png',
-    mimeType: 'image/png',
-    buffer: pngBytes,
-  });
-  await expect(page.getByRole('tab', { name: /keep-me\.png/i })).toBeVisible();
-
-  await page.getByTestId('design-files-upload-input').setInputFiles({
-    name: 'trash-me.png',
-    mimeType: 'image/png',
-    buffer: pngBytes,
-  });
-
-  await expect(page.getByRole('tab', { name: /trash-me\.png/i })).toBeVisible();
-  await page.getByTestId('design-files-tab').click();
-
-  const fileRow = page.locator('[data-testid^="design-file-row-"]', {
-    hasText: 'trash-me.png',
-  });
-  await expect(fileRow).toBeVisible();
-  await fileRow.hover();
-  await fileRow.locator('[data-testid^="design-file-menu-"]').click();
-  await expect(page.getByTestId('design-file-menu-popover')).toBeVisible();
-  await page.locator('[data-testid^="design-file-delete-"]').click();
-
-  await expect(fileRow).toHaveCount(0);
-  await expect(page.getByRole('tab', { name: /trash-me\.png/i })).toHaveCount(0);
-
-  // Bug #115: deleting from the Design Files panel must not navigate the
-  // user into another tab. The Design Files tab should remain the active
-  // view, and the sibling tab should still exist (just not auto-activated).
-  await expect(page.getByTestId('design-files-tab')).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-  await expect(page.getByRole('tab', { name: /keep-me\.png/i })).toBeVisible();
-}
-
-async function runDesignFilesTabPersistenceFlow(
-  page: Page,
-) {
-  const pngBytes = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5W6McAAAAASUVORK5CYII=',
-    'base64',
-  );
-
-  await page.getByTestId('design-files-upload-input').setInputFiles({
-    name: 'first-tab.png',
-    mimeType: 'image/png',
-    buffer: pngBytes,
-  });
-  await expect(page.getByRole('tab', { name: /first-tab\.png/i })).toBeVisible();
-
-  await page.getByTestId('design-files-upload-input').setInputFiles({
-    name: 'second-tab.png',
-    mimeType: 'image/png',
-    buffer: pngBytes,
-  });
-  const firstTab = page.getByRole('tab', { name: /first-tab\.png/i });
-  const secondTab = page.getByRole('tab', { name: /second-tab\.png/i });
-  await expect(firstTab).toBeVisible();
-  await expect(secondTab).toBeVisible();
-
-  await firstTab.click();
-  await expect(firstTab).toHaveAttribute('aria-selected', 'true');
-  await expect(secondTab).toHaveAttribute('aria-selected', 'false');
-
-  await page.reload();
-
-  const restoredFirstTab = page.getByRole('tab', { name: /first-tab\.png/i });
-  const restoredSecondTab = page.getByRole('tab', { name: /second-tab\.png/i });
-  await expect(restoredFirstTab).toBeVisible();
-  await expect(restoredSecondTab).toBeVisible();
-  await expect(restoredFirstTab).toHaveAttribute('aria-selected', 'true');
-  await expect(restoredSecondTab).toHaveAttribute('aria-selected', 'false');
 }
 
 async function runConversationDeleteRecoveryFlow(

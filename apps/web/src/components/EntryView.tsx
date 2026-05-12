@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ConnectorDetail, ConnectorStatusResponse } from '@open-design/contracts';
+import type { ConnectorDetail, ConnectorStatusResponse, ImportFolderResponse } from '@open-design/contracts';
 import { useT } from '../i18n';
 import {
   DEFAULT_AUDIO_MODEL,
@@ -34,11 +34,19 @@ import { PetRail } from './pet/PetRail';
 import { PromptTemplatePreviewModal } from './PromptTemplatePreviewModal';
 import { PromptTemplatesTab } from './PromptTemplatesTab';
 import { apiProtocolLabel } from '../utils/apiProtocol';
+import { isMacPlatform } from '../utils/platform';
 
-type TopTab = 'designs' | 'examples' | 'design-systems' | 'image-templates' | 'video-templates';
+type TopTab = 'designs' | 'templates' | 'design-systems' | 'image-templates' | 'video-templates';
 
 interface Props {
+  // Union of functional skills + design templates — used for id-based
+  // lookups (DesignsTab project chips, NewProjectPanel skill picker).
+  // The Templates gallery itself reads `designTemplates` instead so it
+  // doesn't accidentally show functional skills as renderable cards.
   skills: SkillSummary[];
+  // Design templates only. Sourced from /api/design-templates. See
+  // specs/current/skills-and-design-templates.md.
+  designTemplates: SkillSummary[];
   designSystems: DesignSystemSummary[];
   projects: Project[];
   templates: ProjectTemplate[];
@@ -58,6 +66,7 @@ interface Props {
   onCreateProject: (input: CreateInput & { pendingPrompt?: string }) => void;
   onImportClaudeDesign: (file: File) => Promise<void> | void;
   onImportFolder?: (baseDir: string) => Promise<void> | void;
+  onImportFolderResponse?: (response: ImportFolderResponse) => Promise<void> | void;
   onOpenProject: (id: string) => void;
   onOpenLiveArtifact: (projectId: string, artifactId: string) => void;
   onDeleteProject: (id: string) => void;
@@ -214,6 +223,7 @@ function loadPetRailHidden(): boolean {
 
 export function EntryView({
   skills,
+  designTemplates,
   designSystems,
   projects,
   templates,
@@ -228,6 +238,7 @@ export function EntryView({
   onCreateProject,
   onImportClaudeDesign,
   onImportFolder,
+  onImportFolderResponse,
   onOpenProject,
   onOpenLiveArtifact,
   onDeleteProject,
@@ -449,6 +460,7 @@ export function EntryView({
               <Icon name="settings" size={14} />
             </span>
             <span>{t('avatar.settings')}</span>
+            <span className="avatar-item-meta">{isMacPlatform() ? '⌘,' : 'Ctrl+,'}</span>
           </button>
         </div>
       ) : null}
@@ -476,6 +488,7 @@ export function EntryView({
           onCreate={handleCreate}
           onImportClaudeDesign={onImportClaudeDesign}
           onImportFolder={onImportFolder}
+          onImportFolderResponse={onImportFolderResponse}
           mediaProviders={config.mediaProviders}
           connectors={connectors}
           connectorsLoading={connectorsLoading}
@@ -483,30 +496,43 @@ export function EntryView({
           loading={skillsLoading || designSystemsLoading}
         />
         <div className="entry-side-foot">
-          <button
-            type="button"
-            className={`foot-pill pet-pill${config.pet?.adopted ? '' : ' pet-pill-fresh'}`}
-            onClick={onAdoptPet}
-            title={
-              config.pet?.adopted
-                ? t('pet.changePet')
-                : t('pet.adoptCallout')
-            }
-          >
-            <span className="pet-pill-glyph" aria-hidden>
-              {config.pet?.adopted
-                ? config.pet.petId === 'custom'
-                  ? config.pet.custom.glyph || '🦄'
-                  : '🐾'
-                : '🐾'}
-            </span>
-            <span>
-              {config.pet?.adopted
-                ? t('pet.changePet')
-                : t('pet.adoptCallout')}
-            </span>
-            {!config.pet?.adopted ? <span className="pet-pill-dot" aria-hidden /> : null}
-          </button>
+          <div className="entry-side-foot-row">
+            <button
+              type="button"
+              className={`foot-pill pet-pill${config.pet?.adopted ? '' : ' pet-pill-fresh'}`}
+              onClick={onAdoptPet}
+              title={
+                config.pet?.adopted
+                  ? t('pet.changePet')
+                  : t('pet.adoptCallout')
+              }
+            >
+              <span className="pet-pill-glyph" aria-hidden>
+                {config.pet?.adopted
+                  ? config.pet.petId === 'custom'
+                    ? config.pet.custom.glyph || '🦄'
+                    : '🐾'
+                  : '🐾'}
+              </span>
+              <span className="foot-pill-pet-label">
+                {config.pet?.adopted
+                  ? t('pet.changePet')
+                  : t('pet.adoptCallout')}
+              </span>
+              {!config.pet?.adopted ? <span className="pet-pill-dot" aria-hidden /> : null}
+            </button>
+            <a
+              className="foot-pill foot-pill-follow"
+              href="https://x.com/nexudotio"
+              target="_blank"
+              rel="noreferrer noopener"
+              title="Follow @nexudotio on X for releases and milestones"
+              aria-label="Follow @nexudotio on X"
+            >
+              <Icon name="external-link" size={12} />
+              <span className="foot-pill-follow-label">Follow @nexudotio</span>
+            </a>
+          </div>
           <button
             type="button"
             className="foot-pill"
@@ -525,17 +551,6 @@ export function EntryView({
               {envMetaLine}
             </span>
           </button>
-          <a
-            className="foot-pill"
-            href="https://x.com/nexudotio"
-            target="_blank"
-            rel="noreferrer noopener"
-            title="Follow @nexudotio on X for releases and milestones"
-            aria-label="Follow @nexudotio on X"
-          >
-            <Icon name="external-link" size={12} />
-            <span>Follow @nexudotio</span>
-          </a>
           <LanguageMenu />
         </div>
         <button
@@ -554,7 +569,7 @@ export function EntryView({
         <div className="entry-header">
           <div className="entry-tabs" role="tablist">
             <TopTabButton current={topTab} value="designs" label={t('entry.tabDesigns')} onClick={setTopTab} />
-            <TopTabButton current={topTab} value="examples" label={t('entry.tabExamples')} onClick={setTopTab} />
+            <TopTabButton current={topTab} value="templates" label={t('entry.tabTemplates')} onClick={setTopTab} />
             <TopTabButton
               current={topTab}
               value="design-systems"
@@ -594,11 +609,14 @@ export function EntryView({
               />
             )
           ) : null}
-          {topTab === 'examples' ? (
+          {topTab === 'templates' ? (
             skillsLoading ? (
               <CenteredLoader label={t('common.loading')} />
             ) : (
-              <ExamplesTab skills={skills} onUsePrompt={usePromptFromSkill} />
+              <ExamplesTab
+                skills={designTemplates}
+                onUsePrompt={usePromptFromSkill}
+              />
             )
           ) : null}
           {topTab === 'design-systems' ? (
