@@ -8,6 +8,8 @@ const APP_OWNED_SCENARIO_FLOWS = new Set([
   'design-files-upload',
   'design-files-delete',
   'design-files-tab-persistence',
+  'uploaded-image-renders-in-preview',
+  'python-source-preview',
 ]);
 
 test.beforeEach(async ({ page }) => {
