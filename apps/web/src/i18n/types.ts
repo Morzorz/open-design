@@ -352,6 +352,9 @@ export interface Dict {
   // Memory (auto-extracted personalization saved as on-disk markdown)
   'settings.memory': string;
   'settings.memoryHint': string;
+  'settings.customInstructionsTitle': string;
+  'settings.customInstructionsHint': string;
+  'settings.customInstructionsPlaceholder': string;
   'settings.memoryDescription': string;
   'settings.memoryEnabled': string;
   'settings.memoryDisabled': string;
@@ -404,6 +407,7 @@ export interface Dict {
   'settings.memoryExtractionsHint': string;
   'settings.memoryExtractionsEmpty': string;
   'settings.memoryExtractionsRefresh': string;
+  'settings.memoryExtractionsRefreshing': string;
   'settings.memoryExtractionPhaseRunning': string;
   'settings.memoryExtractionPhaseSuccess': string;
   'settings.memoryExtractionPhaseSkipped': string;
@@ -638,6 +642,20 @@ export interface Dict {
   'newproj.toggleSpeakerNotesHint': string;
   'newproj.toggleAnimations': string;
   'newproj.toggleAnimationsHint': string;
+  'newproj.targetPlatformsLabel': string;
+  'newproj.targetPlatformsHint': string;
+  'newproj.platform.responsive.label': string;
+  'newproj.platform.responsive.hint': string;
+  'newproj.platform.webDesktop.label': string;
+  'newproj.platform.webDesktop.hint': string;
+  'newproj.platform.mobileIos.label': string;
+  'newproj.platform.mobileIos.hint': string;
+  'newproj.platform.mobileAndroid.label': string;
+  'newproj.platform.mobileAndroid.hint': string;
+  'newproj.platform.tablet.label': string;
+  'newproj.platform.tablet.hint': string;
+  'newproj.platform.desktopApp.label': string;
+  'newproj.platform.desktopApp.hint': string;
   'newproj.surfaceOptionsLabel': string;
   'newproj.includeLandingPage': string;
   'newproj.includeLandingPageHint': string;
@@ -881,6 +899,8 @@ export interface Dict {
   // Project view / chat pane / composer
   'project.backToProjects': string;
   'project.metaFreeform': string;
+  'project.customInstructions': string;
+  'project.customInstructionsPlaceholder': string;
   'project.resizeChatPanel': string;
   'chat.tabChat': string;
   'chat.tabComments': string;
@@ -1560,4 +1580,45 @@ export interface Dict {
   'sketch.closeConfirm': string;
   'sketch.textPrompt': string;
   'sketch.textModalTitle': string;
+  // Critique Theater (Phase 8 components; Phase 9 fills non-English locales)
+  'critiqueTheater.userFacingName': string;
+  'critiqueTheater.roleDesigner': string;
+  'critiqueTheater.roleCritic': string;
+  'critiqueTheater.roleBrand': string;
+  'critiqueTheater.roleA11y': string;
+  'critiqueTheater.roleCopy': string;
+  'critiqueTheater.roundLabel': string;
+  'critiqueTheater.mustFix': string;
+  'critiqueTheater.composite': string;
+  'critiqueTheater.threshold': string;
+  'critiqueTheater.consensus': string;
+  'critiqueTheater.interrupt': string;
+  'critiqueTheater.interrupting': string;
+  'critiqueTheater.interrupted': string;
+  'critiqueTheater.degradedHeading': string;
+  'critiqueTheater.degradedReasonMalformed': string;
+  'critiqueTheater.degradedReasonOversize': string;
+  'critiqueTheater.degradedReasonAdapter': string;
+  'critiqueTheater.degradedReasonProtocol': string;
+  'critiqueTheater.degradedReasonMissingArtifact': string;
+  'critiqueTheater.replay': string;
+  'critiqueTheater.replaySpeed': string;
+  'critiqueTheater.readOnly': string;
+  'critiqueTheater.shippedSummary': string;
+  'critiqueTheater.interruptedSummary': string;
+  'critiqueTheater.shippedBadge': string;
+  'critiqueTheater.belowThresholdBadge': string;
+  'critiqueTheater.timedOutBadge': string;
+  'critiqueTheater.failedHeading': string;
+  'critiqueTheater.failedReasonCliExit': string;
+  'critiqueTheater.failedReasonPerRoundTimeout': string;
+  'critiqueTheater.failedReasonTotalTimeout': string;
+  'critiqueTheater.failedReasonOrchestrator': string;
+  'critiqueTheater.transcriptEmpty': string;
+  'critiqueTheater.transcriptLoading': string;
+  'critiqueTheater.transcriptError': string;
+  'critiqueTheater.replaySpeedPaused': string;
+  'critiqueTheater.replaySpeedInstant': string;
+  'critiqueTheater.replaySpeedLive': string;
+  'critiqueTheater.replaySpeedFast': string;
 }

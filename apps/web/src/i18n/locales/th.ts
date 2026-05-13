@@ -1263,4 +1263,6 @@ export const th: Dict = {
   'notify.failureTitle': 'ข้อมูลการงานล้มเหลว',
   'notify.successBody': 'แชทตอบบทสนทนาเรียบร้อย',
   'notify.failureBody': 'หน้าที่ทำผิดพลาด',
+  'settings.memoryExtractionsRefresh': 'รีเฟรช',
+  'settings.memoryExtractionsRefreshing': 'กำลังรีเฟรช…',
 };
