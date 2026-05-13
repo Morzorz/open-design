@@ -16626,7 +16626,6 @@ body.entry-resizing { cursor: col-resize; user-select: none; }
   grid-template-columns: 240px calc(var(--preview-viewport-width) * var(--preview-scale, 1)) 344px;
   justify-content: start;
 }
-}
 
 .manual-edit-canvas {
   position: relative;

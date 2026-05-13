@@ -5035,14 +5035,22 @@ function HtmlViewer({
   }, [handleResizeKeyDown]);
 
   const previewFrame = (
-    <div
-      style={{
-        width: `${100 / previewScale}%`,
-        height: `${100 / previewScale}%`,
-        transform: `scale(${previewScale})`,
-        transformOrigin: '0 0',
-      }}
+    <PreviewDrawOverlay
+      active={drawOverlayOpen}
+      onActiveChange={setDrawOverlayOpen}
+      onModeChange={setDrawOverlayMode}
+      captureTarget={drawClickSelectionMode ? activeCommentTarget : null}
+      sendDisabled={streaming}
+      sendDisabledReason="当前正有任务在执行"
     >
+      <div
+        style={{
+          width: `${100 / previewScale}%`,
+          height: `${100 / previewScale}%`,
+          transform: `scale(${previewScale})`,
+          transformOrigin: '0 0',
+        }}
+      >
       {useUrlLoadPreview ? (
         <iframe
           ref={iframeRef}
@@ -5067,7 +5075,8 @@ function HtmlViewer({
           }}
         />
       )}
-    </div>
+      </div>
+    </PreviewDrawOverlay>
   );
 
   // ARIA max widths — derived from redistributeWidths limits (no DOM measurement needed)

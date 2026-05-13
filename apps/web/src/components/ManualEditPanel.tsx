@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { emptyManualEditStyles, type ManualEditHistoryEntry, type ManualEditPatch, type ManualEditStyles, type ManualEditTarget } from '../edit-mode/types';
 
@@ -40,12 +40,8 @@ export function ManualEditPanel({
   onCancelDraft,
   onUndo,
   onRedo,
-  children,
-  childrenAfter,
 }: {
   targets: ManualEditTarget[];
-  children?: ReactNode;
-  childrenAfter?: ReactNode;
   selectedTarget: ManualEditTarget | null;
   draft: ManualEditDraft;
   history: ManualEditHistoryEntry[];
@@ -137,29 +133,14 @@ export function ManualEditPanel({
             <button type="button" className="cc-advanced-toggle" onClick={() => setAdvancedOpen((v) => !v)}>
               {advancedOpen ? '▾' : '▸'} Advanced
             </button>
-          ))}
-        </div>
-      </aside>
-
-      {children}
-
-      <aside className="manual-edit-right">
-        <section className="manual-edit-modal">
-          <div className="manual-edit-modal-head">
-            <div>
-              <span>{t('manualEdit.title')}</span>
-              <h3>{selectedTarget?.label ?? t('manualEdit.selectLayer')}</h3>
-            </div>
-            <em>{selectedTarget?.kind ?? 'none'}</em>
-          </div>
-          {!selectedTarget ? (
-            <div className="manual-edit-empty">{t('manualEdit.empty')}</div>
-          ) : (
-            <>
-              <div className="manual-edit-meta">
-                <div>
-                  <strong>{selectedTarget.tagName}</strong>
-                  <span>{selectedTarget.id}</span>
+            {advancedOpen ? (
+              <>
+                <div className="manual-edit-tabs" role="tablist">
+                  <EditTabButton label={t('manualEdit.tabStyle')} tab="style" active={tab === 'style'} onClick={setTab} />
+                  <EditTabButton label={t('manualEdit.tabContent')} tab="content" active={tab === 'content'} onClick={setTab} />
+                  <EditTabButton label={t('manualEdit.tabAttributes')} tab="attributes" active={tab === 'attributes'} onClick={setTab} />
+                  <EditTabButton label={t('manualEdit.tabHtml')} tab="html" active={tab === 'html'} onClick={setTab} />
+                  <EditTabButton label={t('manualEdit.tabSource')} tab="source" active={tab === 'source'} onClick={setTab} />
                 </div>
                 <div className="manual-edit-actions">
                   <button type="button" onClick={onCancelDraft} disabled={busy}>{t('common.cancel')}</button>
@@ -224,27 +205,9 @@ export function ManualEditPanel({
               </>
             ) : null}
           </div>
-          <div className="manual-edit-history-actions">
-            <button type="button" onClick={onUndo} disabled={busy || !canUndo}>{t('manualEdit.undo')}</button>
-            <button type="button" onClick={onRedo} disabled={busy || !canRedo}>{t('manualEdit.redo')}</button>
-          </div>
-          {history.length === 0 ? (
-            <div className="manual-edit-empty">{t('manualEdit.noChanges')}</div>
-          ) : (
-            <div className="manual-edit-history-list">
-              {history.map((entry) => (
-                <article key={entry.id} className="manual-edit-history-entry">
-                  <strong>{entry.label}</strong>
-                  <code>{manualEditPatchSummary(entry.patch)}</code>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      </aside>
-
-      {childrenAfter}
-    </>
+        ) : null}
+      </section>
+    </aside>
   );
 }
 
