@@ -16620,11 +16620,12 @@ body.entry-resizing { cursor: col-resize; user-select: none; }
 .manual-edit-resize-handle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-=======
+}
+
 .manual-edit-workspace.preview-viewport:not(.preview-viewport-desktop) {
   grid-template-columns: 240px calc(var(--preview-viewport-width) * var(--preview-scale, 1)) 344px;
   justify-content: start;
->>>>>>> main
+}
 }
 
 .manual-edit-canvas {
